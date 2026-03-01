@@ -1,5 +1,9 @@
 # gh-toolkit
 
+<!-- BADGES:START -->
+[![categorization](https://img.shields.io/badge/-categorization-blue?style=flat-square)](https://github.com/topics/categorization) [![cli-tool](https://img.shields.io/badge/-cli--tool-blue?style=flat-square)](https://github.com/topics/cli-tool) [![github](https://img.shields.io/badge/-github-blue?style=flat-square)](https://github.com/topics/github) [![llm](https://img.shields.io/badge/-llm-ff6f00?style=flat-square)](https://github.com/topics/llm) [![portfolio-management](https://img.shields.io/badge/-portfolio--management-blue?style=flat-square)](https://github.com/topics/portfolio-management) [![python](https://img.shields.io/badge/-python-3776ab?style=flat-square)](https://github.com/topics/python) [![repository-management](https://img.shields.io/badge/-repository--management-blue?style=flat-square)](https://github.com/topics/repository-management) [![shell](https://img.shields.io/badge/-shell-blue?style=flat-square)](https://github.com/topics/shell) [![repository-health-checking](https://img.shields.io/badge/-repository--health--checking-blue?style=flat-square)](https://github.com/topics/repository-health-checking) [![topic-tagging](https://img.shields.io/badge/-topic--tagging-blue?style=flat-square)](https://github.com/topics/topic-tagging)
+<!-- BADGES:END -->
+
 [![PyPI version](https://badge.fury.io/py/gh-toolkit.svg)](https://badge.fury.io/py/gh-toolkit)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
