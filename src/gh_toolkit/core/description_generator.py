@@ -115,7 +115,7 @@ class DescriptionGenerator:
         if readme:
             context += f"\nREADME excerpt:\n{readme[:1500]}\n"
 
-        prompt = f"""Generate a concise one-line description (max 100 chars) for this GitHub repository.
+        prompt = f"""Generate a concise one-line description (max 250 chars) for this GitHub repository.
 The description should explain what the project does, not use marketing language.
 Do not start with "A" or "This". Use active voice.
 Only output the description, nothing else.
@@ -125,7 +125,7 @@ Only output the description, nothing else.
         try:
             response = self._anthropic_client.messages.create(
                 model=self.model,
-                max_tokens=150,
+                max_tokens=300,
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -141,7 +141,7 @@ Only output the description, nothing else.
             if description:
                 # Remove surrounding quotes if present
                 description = description.strip('"\'')
-                return description[:100]
+                return description[:250]
 
             return None
 
@@ -165,14 +165,14 @@ Only output the description, nothing else.
         # Try to construct something meaningful
         if topics and lang:
             topic_str = ", ".join(topics[:3])
-            return f"{lang} project for {topic_str}"[:100]
+            return f"{lang} project for {topic_str}"[:250]
         elif lang:
-            return f"{lang} project: {name}"[:100]
+            return f"{lang} project: {name}"[:250]
         elif topics:
             topic_str = ", ".join(topics[:3])
-            return f"Project for {topic_str}"[:100]
+            return f"Project for {topic_str}"[:250]
         else:
-            return f"Project: {name}"[:100]
+            return f"Project: {name}"[:250]
 
     def update_description(
         self, owner: str, repo: str, description: str, dry_run: bool = False
