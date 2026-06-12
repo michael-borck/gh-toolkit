@@ -52,6 +52,13 @@ gh-toolkit site generate data.json --theme resume
 
 See [docs/gh-cli-comparison.md](docs/gh-cli-comparison.md) for a detailed feature comparison.
 
+> **Working with *local* clones instead?**
+> [git-toolkit](https://github.com/michael-borck/git-toolkit) is the
+> local-side complement: plain-bash `git` subcommands for the checkouts on
+> your disk — `git repos` (status/sync across many clones) and `git sweep`
+> (reclaim cache space, find safe-to-delete clones). gh-toolkit manages your
+> repos *on GitHub*; git-toolkit tidies the ones on your machine.
+
 ## 🚀 Quick Start
 
 ### Installation
