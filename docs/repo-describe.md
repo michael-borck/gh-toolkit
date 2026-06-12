@@ -18,7 +18,7 @@ gh-toolkit repo describe <REPOS_INPUT> [OPTIONS]
 |--------|------|-------------|---------|
 | `--token`, `-t` | TEXT | GitHub personal access token | `$GITHUB_TOKEN` |
 | `--anthropic-key` | TEXT | Anthropic API key for LLM generation | `$ANTHROPIC_API_KEY` |
-| `--model`, `-m` | TEXT | Anthropic model to use | `claude-3-haiku-20240307` |
+| `--model`, `-m` | TEXT | Anthropic model to use | `claude-haiku-4-5` |
 | `--dry-run` | FLAG | Preview descriptions without making changes | Execute changes |
 | `--force` | FLAG | Update description even if one already exists | Skip existing |
 | `--rate-limit`, `-r` | FLOAT | Seconds between API requests | `0.5` |
@@ -44,13 +44,13 @@ gh-toolkit repo describe "user/*"
 
 ```bash
 # Use Haiku (fastest, default)
-gh-toolkit repo describe user/repo --model claude-3-haiku-20240307
+gh-toolkit repo describe user/repo --model claude-haiku-4-5
 
 # Use Sonnet (balanced)
-gh-toolkit repo describe user/repo --model claude-sonnet-4-20250514
+gh-toolkit repo describe user/repo --model claude-sonnet-4-6
 
 # Use Opus (highest quality)
-gh-toolkit repo describe user/repo --model claude-opus-4-20250514
+gh-toolkit repo describe user/repo --model claude-opus-4-8
 ```
 
 ### Bulk Operations

@@ -15,7 +15,10 @@ console = Console()
 
 def accept_invitations(
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be accepted without making changes"
@@ -199,7 +202,10 @@ def accept_invitations(
 
 def leave_repositories(
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     dry_run: bool = typer.Option(
         False,

@@ -6,6 +6,7 @@ from typing import Any
 from rich.console import Console
 
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
+from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
 
 console = Console()
 
@@ -13,7 +14,7 @@ console = Console()
 class TopicTagger:
     """Automatically add relevant topic tags to GitHub repositories using LLM analysis."""
 
-    DEFAULT_MODEL = "claude-3-haiku-20240307"
+    DEFAULT_MODEL = DEFAULT_LLM_MODEL
 
     def __init__(
         self,
@@ -29,7 +30,7 @@ class TopicTagger:
             github_client: Authenticated GitHub client
             anthropic_api_key: Optional Anthropic API key for LLM features
             rate_limit: Seconds to wait between API requests (default: 0.5)
-            model: Anthropic model to use (default: claude-3-haiku-20240307)
+            model: Anthropic model to use (default: claude-haiku-4-5)
             preferred_tags: Optional string describing preferred tags to consider
         """
         self.client = github_client

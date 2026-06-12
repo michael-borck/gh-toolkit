@@ -380,6 +380,45 @@ class TestRepoCloner:
         estimate = repo_cloner.estimate_disk_space(repos)
         assert "GB" in estimate
 
+    def test_concurrent_clone_same_repo_only_clones_once(self, tmp_path):
+        """Parallel workers must not race to clone the same target path."""
+        import threading
+
+        cloner = RepoCloner(target_dir=tmp_path, parallel=4)
+        barrier = threading.Barrier(4)
+        clone_calls: list[list[str]] = []
+        call_lock = threading.Lock()
+
+        def fake_run(cmd, **kwargs):
+            # All threads that got past the claim would land here together
+            with call_lock:
+                clone_calls.append(cmd)
+            return Mock(returncode=0, stdout="", stderr="")
+
+        def attempt():
+            barrier.wait()
+            return cloner.clone_repository(
+                "user/repo", use_ssh=False, skip_existing=True
+            )
+
+        with patch("subprocess.run", side_effect=fake_run):
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+                results = list(ex.map(lambda _: attempt(), range(4)))
+
+        # Exactly one thread performs the clone; the rest are skipped
+        git_clones = [c for c in clone_calls if c[:2] == ["git", "clone"]]
+        assert len(git_clones) == 1
+        assert sum(1 for r in results if r.success) == 1
+        assert sum(1 for r in results if r.skipped) == 3
+
+    def test_parse_repo_input_rejects_traversal(self, repo_cloner):
+        """Owner/repo names that could escape the target dir are rejected."""
+        for bad in ["../etc/passwd", "owner/..", "owner/re po"]:
+            with pytest.raises(ValueError):
+                repo_cloner.parse_repo_input(bad)
+
     @patch("shutil.rmtree")
     def test_cleanup_failed_clones(self, mock_rmtree, repo_cloner, tmp_path):
         """Test cleanup of failed clone directories."""

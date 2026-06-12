@@ -6,6 +6,10 @@ import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from gh_toolkit.core.llm import (
+    DEFAULT_LLM_MODEL,
+)
+
 if TYPE_CHECKING:
     from gh_toolkit.tui.widgets.action_modal import ActionResult
 
@@ -77,7 +81,7 @@ class ActionExecutor:
             )
 
         client = GitHubClient(self.github_token)
-        model = action_result.options.get("describe_model", "claude-3-haiku-20240307")
+        model = action_result.options.get("describe_model", DEFAULT_LLM_MODEL)
         generator = DescriptionGenerator(client, self.anthropic_key, 0.5, model)
 
         results = generator.process_multiple_repositories(
@@ -105,7 +109,7 @@ class ActionExecutor:
         from gh_toolkit.core.topic_tagger import TopicTagger
 
         client = GitHubClient(self.github_token)
-        model = action_result.options.get("tag_model", "claude-3-haiku-20240307")
+        model = action_result.options.get("tag_model", DEFAULT_LLM_MODEL)
         preferred = action_result.options.get("tag_preferred", "")
 
         tagger = TopicTagger(client, self.anthropic_key, 0.5, model, preferred or None)
@@ -346,7 +350,7 @@ class ActionExecutor:
             )
 
         client = GitHubClient(self.github_token)
-        model = action_result.options.get("readme_model", "claude-3-haiku-20240307")
+        model = action_result.options.get("readme_model", DEFAULT_LLM_MODEL)
         generator = RepoReadmeGenerator(client, self.anthropic_key, 0.5, model)
 
         results = generator.process_multiple_repositories(

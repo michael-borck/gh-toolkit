@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from gh_toolkit.core.github_client import GitHubClient
+from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
 from gh_toolkit.core.topic_tagger import TopicTagger
 
 console = Console()
@@ -20,7 +21,10 @@ def tag_repos(
         help="Repository (owner/repo), file with repo list, or 'username/*' for all user repos"
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     anthropic_key: str | None = typer.Option(
         None,
@@ -28,10 +32,10 @@ def tag_repos(
         help="Anthropic API key for LLM tagging (or set ANTHROPIC_API_KEY env var)",
     ),
     model: str = typer.Option(
-        "claude-3-haiku-20240307",
+        DEFAULT_LLM_MODEL,
         "--model",
         "-m",
-        help="Anthropic model to use (e.g., claude-sonnet-4-20250514)",
+        help="Anthropic model to use (e.g., claude-sonnet-4-6)",
     ),
     tags: str | None = typer.Option(
         None,

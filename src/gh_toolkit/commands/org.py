@@ -24,7 +24,7 @@ def readme(
         None,
         "--token",
         "-t",
-        help="GitHub token (defaults to GITHUB_TOKEN env var)",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     anthropic_key: str | None = typer.Option(
         None,

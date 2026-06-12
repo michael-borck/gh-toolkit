@@ -19,6 +19,12 @@ from textual.widgets import (
     Static,
 )
 
+from gh_toolkit.core.llm import (
+    ADVANCED_LLM_MODEL,
+    BALANCED_LLM_MODEL,
+    DEFAULT_LLM_MODEL,
+)
+
 
 @dataclass
 class ActionResult:
@@ -38,11 +44,11 @@ class ActionOptions:
     dry_run: bool = False
 
     # Describe options
-    describe_model: str = "claude-3-haiku-20240307"
+    describe_model: str = DEFAULT_LLM_MODEL
     describe_force: bool = False
 
     # Tag options
-    tag_model: str = "claude-3-haiku-20240307"
+    tag_model: str = DEFAULT_LLM_MODEL
     tag_force: bool = False
     tag_preferred: str = ""
 
@@ -55,7 +61,7 @@ class ActionOptions:
     health_rules: str = "default"
 
     # README options
-    readme_model: str = "claude-3-haiku-20240307"
+    readme_model: str = DEFAULT_LLM_MODEL
     readme_force: bool = False
     readme_min_quality: float = 0.5
 
@@ -353,24 +359,24 @@ class ActionModal(ModalScreen[ActionResult | None]):
     def _get_model_name(self, radio_set_id: str) -> str:
         """Get the selected model name from a radio set."""
         model_map = {
-            "model-haiku": "claude-3-haiku-20240307",
-            "tag-model-haiku": "claude-3-haiku-20240307",
-            "readme-model-haiku": "claude-3-haiku-20240307",
-            "model-sonnet": "claude-sonnet-4-20250514",
-            "tag-model-sonnet": "claude-sonnet-4-20250514",
-            "readme-model-sonnet": "claude-sonnet-4-20250514",
-            "model-opus": "claude-opus-4-20250514",
-            "readme-model-opus": "claude-opus-4-20250514",
+            "model-haiku": DEFAULT_LLM_MODEL,
+            "tag-model-haiku": DEFAULT_LLM_MODEL,
+            "readme-model-haiku": DEFAULT_LLM_MODEL,
+            "model-sonnet": BALANCED_LLM_MODEL,
+            "tag-model-sonnet": BALANCED_LLM_MODEL,
+            "readme-model-sonnet": BALANCED_LLM_MODEL,
+            "model-opus": ADVANCED_LLM_MODEL,
+            "readme-model-opus": ADVANCED_LLM_MODEL,
         }
         try:
             radio_set = self.query_one(f"#{radio_set_id}", RadioSet)
             if radio_set.pressed_button:
                 button_id = radio_set.pressed_button.id
                 if button_id:
-                    return model_map.get(button_id, "claude-3-haiku-20240307")
+                    return model_map.get(button_id, DEFAULT_LLM_MODEL)
         except Exception:
             pass
-        return "claude-3-haiku-20240307"
+        return DEFAULT_LLM_MODEL
 
     def _get_badge_style(self) -> str:
         """Get the selected badge style."""

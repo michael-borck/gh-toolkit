@@ -18,7 +18,7 @@ gh-toolkit repo tag [REPO_PATTERNS...] [OPTIONS]
 |--------|------|-------------|---------|
 | `--token`, `-t` | TEXT | GitHub personal access token | `$GITHUB_TOKEN` |
 | `--anthropic-key` | TEXT | Anthropic API key for LLM categorization | `$ANTHROPIC_API_KEY` |
-| `--model`, `-m` | TEXT | Anthropic model to use for AI tagging | `claude-3-haiku-20240307` |
+| `--model`, `-m` | TEXT | Anthropic model to use for AI tagging | `claude-haiku-4-5` |
 | `--tags` | TEXT | Preferred tags to consider (comma-separated with descriptions) | |
 | `--force` | FLAG | Overwrite existing topics | Don't overwrite |
 | `--dry-run` | FLAG | Show what would be tagged without making changes | Execute changes |
@@ -88,13 +88,13 @@ gh-toolkit repo tag "myorg/*" --output tagging-results.json
 
 ```bash
 # Use Haiku (fastest, default)
-gh-toolkit repo tag user/repo --model claude-3-haiku-20240307
+gh-toolkit repo tag user/repo --model claude-haiku-4-5
 
 # Use Sonnet for better accuracy
-gh-toolkit repo tag user/repo --model claude-sonnet-4-20250514
+gh-toolkit repo tag user/repo --model claude-sonnet-4-6
 
 # Use Opus for highest quality
-gh-toolkit repo tag user/repo --model claude-opus-4-20250514
+gh-toolkit repo tag user/repo --model claude-opus-4-8
 ```
 
 ### Preferred Tags

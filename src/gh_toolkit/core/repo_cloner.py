@@ -55,6 +55,7 @@ class RepoCloner:
         self.target_dir = Path(target_dir)
         self.parallel = parallel
         self._lock = threading.Lock()
+        self._in_progress: set[Path] = set()
 
     def parse_repo_input(self, repo_input: str) -> tuple[str, str]:
         """Parse repository input into owner and repo name.
@@ -82,6 +83,8 @@ class RepoCloner:
                 # Clean up repo name (remove .git suffix if present)
                 if repo.endswith(".git"):
                     repo = repo[:-4]
+                if not (self._is_valid_name(owner) and self._is_valid_name(repo)):
+                    raise ValueError(f"Invalid repository format: {repo_input}")
                 return owner, repo
             else:
                 raise ValueError(f"Invalid repository format: {repo_input}")
@@ -89,6 +92,15 @@ class RepoCloner:
         raise ValueError(
             f"Invalid repository format: {repo_input}. Use 'owner/repo' or GitHub URL"
         )
+
+    @staticmethod
+    def _is_valid_name(name: str) -> bool:
+        """Validate a GitHub owner/repo name segment.
+
+        Names become filesystem path components, so reject anything that
+        could traverse outside the target directory ('..', separators).
+        """
+        return bool(re.match(r"^[A-Za-z0-9._-]+$", name)) and name not in (".", "..")
 
     def _parse_github_url(self, url: str) -> tuple[str, str]:
         """Parse GitHub URL into owner and repo name.
@@ -198,55 +210,71 @@ class RepoCloner:
             clone_url = self.build_clone_url(owner, repo, use_ssh)
             target_path = self.get_target_path(owner, repo)
 
-            # Check if repository already exists
-            if target_path.exists() and skip_existing:
-                return CloneResult(
-                    repo_name=f"{owner}/{repo}",
-                    repo_url=clone_url,
-                    target_path=target_path,
-                    success=False,
-                    skipped=True,
-                    skip_reason="Repository already exists locally",
-                )
-
-            # Create parent directory
+            # Claim the target path atomically: the existence check, the
+            # in-progress check, and the parent mkdir must happen under the
+            # same lock or two parallel workers can both clone the same path
             with self._lock:
+                if target_path.exists() and skip_existing:
+                    return CloneResult(
+                        repo_name=f"{owner}/{repo}",
+                        repo_url=clone_url,
+                        target_path=target_path,
+                        success=False,
+                        skipped=True,
+                        skip_reason="Repository already exists locally",
+                    )
+
+                if target_path in self._in_progress:
+                    return CloneResult(
+                        repo_name=f"{owner}/{repo}",
+                        repo_url=clone_url,
+                        target_path=target_path,
+                        success=False,
+                        skipped=True,
+                        skip_reason="Clone already in progress",
+                    )
+
+                self._in_progress.add(target_path)
                 target_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Build git clone command
-            cmd = ["git", "clone"]
+            try:
+                # Build git clone command
+                cmd = ["git", "clone"]
 
-            if depth is not None:
-                cmd.extend(["--depth", str(depth)])
+                if depth is not None:
+                    cmd.extend(["--depth", str(depth)])
 
-            if branch is not None:
-                cmd.extend(["--branch", branch])
+                if branch is not None:
+                    cmd.extend(["--branch", branch])
 
-            cmd.extend([clone_url, str(target_path)])
+                cmd.extend([clone_url, str(target_path)])
 
-            # Execute clone
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300,  # 5 minute timeout
-            )
-
-            if result.returncode == 0:
-                return CloneResult(
-                    repo_name=f"{owner}/{repo}",
-                    repo_url=clone_url,
-                    target_path=target_path,
-                    success=True,
+                # Execute clone
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,  # 5 minute timeout
                 )
-            else:
-                return CloneResult(
-                    repo_name=f"{owner}/{repo}",
-                    repo_url=clone_url,
-                    target_path=target_path,
-                    success=False,
-                    error=result.stderr.strip() or "Clone failed",
-                )
+
+                if result.returncode == 0:
+                    return CloneResult(
+                        repo_name=f"{owner}/{repo}",
+                        repo_url=clone_url,
+                        target_path=target_path,
+                        success=True,
+                    )
+                else:
+                    return CloneResult(
+                        repo_name=f"{owner}/{repo}",
+                        repo_url=clone_url,
+                        target_path=target_path,
+                        success=False,
+                        error=result.stderr.strip() or "Clone failed",
+                    )
+            finally:
+                with self._lock:
+                    self._in_progress.discard(target_path)
 
         except ValueError as e:
             return CloneResult(

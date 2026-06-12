@@ -8,6 +8,7 @@ from typing import Any
 from rich.console import Console
 
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
+from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
 
 console = Console()
 
@@ -219,7 +220,7 @@ Respond with valid JSON containing:
 JSON only, no markdown code blocks:"""
 
         response = self._anthropic_client.messages.create(
-            model="claude-3-haiku-20240307",
+            model=DEFAULT_LLM_MODEL,
             max_tokens=500,
             temperature=0.7,
             messages=[{"role": "user", "content": prompt}],

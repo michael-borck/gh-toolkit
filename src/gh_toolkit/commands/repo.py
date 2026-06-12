@@ -10,6 +10,7 @@ from rich.table import Table
 
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
 from gh_toolkit.core.health_checker import HealthReport, RepositoryHealthChecker
+from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
 from gh_toolkit.core.repo_cloner import CloneResult, CloneStats, RepoCloner
 from gh_toolkit.core.repo_extractor import RepositoryExtractor
 
@@ -19,7 +20,10 @@ console = Console()
 def list_repos(
     owner: str = typer.Argument(help="GitHub username or organization name"),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     public: bool = typer.Option(
         False, "--public", help="Show only public repositories"
@@ -245,7 +249,10 @@ def extract_repos(
         help="File with repo list (owner/repo per line) or single owner/repo"
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     anthropic_key: str | None = typer.Option(
         None,
@@ -381,7 +388,10 @@ def health_check(
         help="File with repo list (owner/repo per line) or single owner/repo"
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     rules: str = typer.Option(
         "general", "--rules", "-r", help="Rule set: general, academic, professional"
@@ -964,7 +974,10 @@ def describe_repos(
         help="Repository (owner/repo), file with repo list, or 'username/*' for all user repos"
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     anthropic_key: str | None = typer.Option(
         None,
@@ -972,10 +985,10 @@ def describe_repos(
         help="Anthropic API key for LLM generation (or set ANTHROPIC_API_KEY env var)",
     ),
     model: str = typer.Option(
-        "claude-3-haiku-20240307",
+        DEFAULT_LLM_MODEL,
         "--model",
         "-m",
-        help="Anthropic model to use (e.g., claude-sonnet-4-20250514, claude-3-haiku-20240307)",
+        help="Anthropic model to use (e.g., claude-sonnet-4-6, claude-haiku-4-5)",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -1289,7 +1302,10 @@ def generate_badges(
         help="Repository (owner/repo) or 'username/*' for all user repos"
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     style: str = typer.Option(
         "flat-square",
@@ -1534,7 +1550,10 @@ def readme_repos(
         help="Repository (owner/repo), file with repo list, or 'username/*' for all user repos"
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     anthropic_key: str | None = typer.Option(
         None,
@@ -1542,10 +1561,10 @@ def readme_repos(
         help="Anthropic API key for LLM generation (or set ANTHROPIC_API_KEY env var)",
     ),
     model: str = typer.Option(
-        "claude-3-haiku-20240307",
+        DEFAULT_LLM_MODEL,
         "--model",
         "-m",
-        help="Anthropic model to use (e.g., claude-sonnet-4-20250514)",
+        help="Anthropic model to use (e.g., claude-sonnet-4-6)",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -1593,7 +1612,7 @@ def readme_repos(
     Examples:
         gh-toolkit repo readme user/repo --dry-run
         gh-toolkit repo readme "user/*" --min-quality 0.6
-        gh-toolkit repo readme repos.txt --force --model claude-sonnet-4-20250514
+        gh-toolkit repo readme repos.txt --force --model claude-sonnet-4-6
         gh-toolkit repo readme "user/*" --update-tags
     """
     from gh_toolkit.core.repo_readme_generator import RepoReadmeGenerator
@@ -1815,7 +1834,10 @@ def license_repos(
         help="Repository (owner/repo), file with repo list, or 'username/*' for all user repos",
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     license_type: str = typer.Option(
         "mit",

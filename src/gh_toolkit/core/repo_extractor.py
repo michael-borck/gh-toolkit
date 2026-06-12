@@ -14,6 +14,7 @@ from rich.progress import (
 )
 
 from gh_toolkit.core.github_client import GitHubClient
+from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
 
 console = Console()
 
@@ -525,7 +526,7 @@ Respond with ONLY the category name from the list above. Choose the most specifi
 
         try:
             response = self._anthropic_client.messages.create(
-                model="claude-3-haiku-20240307",
+                model=DEFAULT_LLM_MODEL,
                 max_tokens=50,
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}],

@@ -31,7 +31,10 @@ def initiate_transfer(
         None, "--new-name", help="New repository name (optional)"
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be transferred without making changes"
@@ -231,7 +234,10 @@ def list_transfers(
         None, "--org", help="Filter pending repository transfers by organization"
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
 ) -> None:
     """List pending repository transfers."""
@@ -378,7 +384,10 @@ def accept_transfers(
         False, "--all", help="Accept all pending transfers"
     ),
     token: str | None = typer.Option(
-        None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be accepted without making changes"

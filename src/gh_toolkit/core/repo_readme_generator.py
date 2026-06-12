@@ -8,6 +8,7 @@ from typing import Any
 from rich.console import Console
 
 from gh_toolkit.core.github_client import GitHubClient
+from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
 
 console = Console()
 
@@ -20,7 +21,7 @@ class RepoReadmeGenerator:
         client: GitHubClient,
         anthropic_key: str | None = None,
         rate_limit: float = 0.5,
-        model: str = "claude-3-haiku-20240307",
+        model: str = DEFAULT_LLM_MODEL,
     ):
         """Initialize the README generator.
 
