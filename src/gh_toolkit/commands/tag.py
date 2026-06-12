@@ -102,12 +102,14 @@ def tag_repos(
             raise typer.Exit(1)
 
         # Show what we're about to do
-        console.print(
-            f"\n[blue]Found {len(repo_list)} repositories to process[/blue]"
-        )
+        console.print(f"\n[blue]Found {len(repo_list)} repositories to process[/blue]")
         console.print(f"[blue]Using model: {model}[/blue]")
         if tags:
-            console.print(f"[blue]Preferred tags: {tags[:80]}...[/blue]" if len(tags) > 80 else f"[blue]Preferred tags: {tags}[/blue]")
+            console.print(
+                f"[blue]Preferred tags: {tags[:80]}...[/blue]"
+                if len(tags) > 80
+                else f"[blue]Preferred tags: {tags}[/blue]"
+            )
         if dry_run:
             console.print("[yellow]DRY RUN MODE - No changes will be made[/yellow]")
         if force:

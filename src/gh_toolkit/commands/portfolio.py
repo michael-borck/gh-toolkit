@@ -94,13 +94,17 @@ def generate(
     try:
         # Validate inputs
         if not org and not discover:
-            console.print("[red]Error: Specify --org names or use --discover flag[/red]")
+            console.print(
+                "[red]Error: Specify --org names or use --discover flag[/red]"
+            )
             raise typer.Exit(1)
 
         # Get tokens
         github_token = token or os.environ.get("GITHUB_TOKEN")
         if not github_token:
-            console.print("[red]Error: GitHub token required. Set GITHUB_TOKEN or use --token[/red]")
+            console.print(
+                "[red]Error: GitHub token required. Set GITHUB_TOKEN or use --token[/red]"
+            )
             raise typer.Exit(1)
 
         anthropic_api_key = anthropic_key or os.environ.get("ANTHROPIC_API_KEY")
@@ -108,13 +112,17 @@ def generate(
         # Validate theme
         valid_themes = ["educational", "resume", "research", "portfolio"]
         if theme not in valid_themes:
-            console.print(f"[red]Error: Invalid theme '{theme}'. Choose from: {', '.join(valid_themes)}[/red]")
+            console.print(
+                f"[red]Error: Invalid theme '{theme}'. Choose from: {', '.join(valid_themes)}[/red]"
+            )
             raise typer.Exit(1)
 
         # Validate group_by
         valid_group_by = ["org", "category", "language"]
         if group_by not in valid_group_by:
-            console.print(f"[red]Error: Invalid group-by '{group_by}'. Choose from: {', '.join(valid_group_by)}[/red]")
+            console.print(
+                f"[red]Error: Invalid group-by '{group_by}'. Choose from: {', '.join(valid_group_by)}[/red]"
+            )
             raise typer.Exit(1)
 
         # Initialize client and generator
@@ -135,7 +143,9 @@ def generate(
             console.print("[yellow]No organizations found[/yellow]")
             raise typer.Exit(0)
 
-        console.print(f"[blue]Generating portfolio for {len(org_names)} organizations:[/blue]")
+        console.print(
+            f"[blue]Generating portfolio for {len(org_names)} organizations:[/blue]"
+        )
         for name in org_names:
             console.print(f"  - {name}")
 
@@ -146,7 +156,9 @@ def generate(
                 org_info = client.get_org_info(org_name)
                 org_infos[org_name] = org_info
             except GitHubAPIError as e:
-                console.print(f"[yellow]Warning: Could not fetch info for {org_name}: {e.message}[/yellow]")
+                console.print(
+                    f"[yellow]Warning: Could not fetch info for {org_name}: {e.message}[/yellow]"
+                )
                 org_infos[org_name] = {"login": org_name, "description": None}
 
         # Aggregate repositories
@@ -170,7 +182,9 @@ def generate(
         )
 
         if dry_run:
-            console.print("\n[yellow]--- DRY RUN: Preview of generated README ---[/yellow]\n")
+            console.print(
+                "\n[yellow]--- DRY RUN: Preview of generated README ---[/yellow]\n"
+            )
             console.print(readme_content)
             console.print("\n[yellow]--- End of preview ---[/yellow]")
         else:
@@ -186,7 +200,9 @@ def generate(
             )
 
             if dry_run:
-                console.print(f"\n[yellow]Would generate HTML portfolio at: {html_path}[/yellow]")
+                console.print(
+                    f"\n[yellow]Would generate HTML portfolio at: {html_path}[/yellow]"
+                )
             else:
                 generator.save_html(html_content, html_path)
 
@@ -255,13 +271,17 @@ def audit(
     try:
         # Validate inputs
         if not org and not discover and not user:
-            console.print("[red]Error: Specify --org names, use --discover flag, or use --user flag[/red]")
+            console.print(
+                "[red]Error: Specify --org names, use --discover flag, or use --user flag[/red]"
+            )
             raise typer.Exit(1)
 
         # Get token
         github_token = token or os.environ.get("GITHUB_TOKEN")
         if not github_token:
-            console.print("[red]Error: GitHub token required. Set GITHUB_TOKEN or use --token[/red]")
+            console.print(
+                "[red]Error: GitHub token required. Set GITHUB_TOKEN or use --token[/red]"
+            )
             raise typer.Exit(1)
 
         # Initialize client and generator
@@ -307,7 +327,9 @@ def audit(
         if user:
             console.print("[blue]Including personal repositories...[/blue]")
             visibility = "all" if include_private else "public"
-            user_repos = client.get_user_repos(visibility=visibility, affiliation="owner")
+            user_repos = client.get_user_repos(
+                visibility=visibility, affiliation="owner"
+            )
             for repo in user_repos:
                 if exclude_forks and repo.get("fork"):
                     continue
@@ -327,10 +349,13 @@ def audit(
         # Save to file if requested
         if output:
             import json
+
             output_path = Path(output)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-            console.print(f"\n[green]Audit report saved to {output_path.absolute()}[/green]")
+            console.print(
+                f"\n[green]Audit report saved to {output_path.absolute()}[/green]"
+            )
 
     except GitHubAPIError as e:
         console.print(f"[red]GitHub API error: {e.message}[/red]")

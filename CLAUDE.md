@@ -116,9 +116,10 @@ export ANTHROPIC_API_KEY=sk-ant-...  # Optional, enables LLM features
 - `write:org` - Accept organization invitations
 
 ### Type Safety Implementation Notes
-- **4 type ignores** in `src/gh_toolkit/commands/site.py` (lines 73, 75, 83, 85) for JSON/YAML loading
-- **1 safe cast** in `src/gh_toolkit/commands/site.py` (line 98) after runtime validation
+- **4 type ignores** in `src/gh_toolkit/commands/site.py` (lines 66, 68, 78, 80) for JSON/YAML loading
+- **1 safe cast** in `src/gh_toolkit/commands/site.py` (line 97) after runtime validation
 - **2 type ignores** in `src/gh_toolkit/core/portfolio_generator.py` for reusing SiteGenerator internals
+- **`tui/` package excluded** from basedpyright (see `[tool.basedpyright]` in pyproject.toml): textual's dynamic widget/reactive APIs don't satisfy strict mode; everything else in `src/` is checked strictly and must stay at 0 errors
 - **Defensive patterns** in `repo_extractor.py`, `topic_tagger.py`, and `readme_generator.py` for external API responses
 - All documented in `TYPE_SAFETY_DOCUMENTATION.md` with risk assessment
 

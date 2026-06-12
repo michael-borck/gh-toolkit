@@ -63,7 +63,11 @@ class PreviewScreen(Screen[None]):
             Static(f"README Preview - {self.org_name}", classes="screen-title"),
             Static("", id="options-bar", classes="options-bar"),
             VerticalScroll(
-                Static("Generating README...", id="preview-content", classes="preview-content"),
+                Static(
+                    "Generating README...",
+                    id="preview-content",
+                    classes="preview-content",
+                ),
                 id="preview-scroll",
             ),
             classes="content",

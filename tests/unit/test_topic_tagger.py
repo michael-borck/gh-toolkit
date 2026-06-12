@@ -13,7 +13,7 @@ class TestTopicTagger:
         self, mock_github_token, mock_anthropic_key, mocker
     ):
         """Test TopicTagger initialization with Anthropic key."""
-        mock_anthropic_class = mocker.patch("gh_toolkit.core.topic_tagger.Anthropic")
+        mock_anthropic_class = mocker.patch("anthropic.Anthropic")
 
         client = GitHubClient(mock_github_token)
         tagger = TopicTagger(client, mock_anthropic_key)
@@ -43,7 +43,7 @@ class TestTopicTagger:
         self, mock_github_token, mock_anthropic_key, mocker
     ):
         """Test handling of missing Anthropic package."""
-        mocker.patch("gh_toolkit.core.topic_tagger.Anthropic", side_effect=ImportError)
+        mocker.patch("anthropic.Anthropic", side_effect=ImportError)
 
         client = GitHubClient(mock_github_token)
         tagger = TopicTagger(client, mock_anthropic_key)

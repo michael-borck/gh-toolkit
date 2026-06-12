@@ -531,12 +531,8 @@ Respond with ONLY the category name from the list above. Choose the most specifi
                 messages=[{"role": "user", "content": prompt}],
             )
 
-            response_content = response.content[0]
-            category = (
-                getattr(response_content, "text", "").strip()
-                if hasattr(response_content, "text")
-                else ""
-            )
+            response_content = response.content[0] if response.content else None
+            category = getattr(response_content, "text", "").strip()
 
             # Validate category
             valid_categories = [

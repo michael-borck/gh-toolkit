@@ -102,7 +102,9 @@ class ActionModal(ModalScreen[ActionResult | None]):
             ),
             VerticalScroll(
                 # Action selection
-                Static("[bold]Select Actions[/bold]", classes="section-header", markup=True),
+                Static(
+                    "[bold]Select Actions[/bold]", classes="section-header", markup=True
+                ),
                 Checkbox("Generate Descriptions", id="action-describe"),
                 Checkbox("Generate README", id="action-readme"),
                 Checkbox("Add License", id="action-license"),
@@ -110,13 +112,18 @@ class ActionModal(ModalScreen[ActionResult | None]):
                 Checkbox("Generate Badges", id="action-badges"),
                 Checkbox("Health Check", id="action-health"),
                 Checkbox("Audit", id="action-audit"),
-
                 # Common options
-                Static("[bold]Common Options[/bold]", classes="section-header", markup=True),
+                Static(
+                    "[bold]Common Options[/bold]", classes="section-header", markup=True
+                ),
                 Checkbox("Dry Run (preview only)", id="opt-dry-run", value=True),
-
                 # Describe options
-                Static("[bold]Description Options[/bold]", id="describe-section", classes="section-header hidden", markup=True),
+                Static(
+                    "[bold]Description Options[/bold]",
+                    id="describe-section",
+                    classes="section-header hidden",
+                    markup=True,
+                ),
                 Horizontal(
                     Label("Model:", classes="field-label"),
                     RadioSet(
@@ -128,10 +135,18 @@ class ActionModal(ModalScreen[ActionResult | None]):
                     ),
                     classes="field-row",
                 ),
-                Checkbox("Force update existing", id="describe-force", classes="hidden-option"),
-
+                Checkbox(
+                    "Force update existing",
+                    id="describe-force",
+                    classes="hidden-option",
+                ),
                 # Tag options
-                Static("[bold]Topic Options[/bold]", id="tag-section", classes="section-header hidden", markup=True),
+                Static(
+                    "[bold]Topic Options[/bold]",
+                    id="tag-section",
+                    classes="section-header hidden",
+                    markup=True,
+                ),
                 Horizontal(
                     Label("Model:", classes="field-label"),
                     RadioSet(
@@ -144,13 +159,22 @@ class ActionModal(ModalScreen[ActionResult | None]):
                 ),
                 Horizontal(
                     Label("Preferred tags:", classes="field-label"),
-                    Input(placeholder="edtech: Educational, tool: CLI tools", id="tag-preferred"),
+                    Input(
+                        placeholder="edtech: Educational, tool: CLI tools",
+                        id="tag-preferred",
+                    ),
                     classes="field-row",
                 ),
-                Checkbox("Force update existing", id="tag-force", classes="hidden-option"),
-
+                Checkbox(
+                    "Force update existing", id="tag-force", classes="hidden-option"
+                ),
                 # Badges options
-                Static("[bold]Badge Options[/bold]", id="badges-section", classes="section-header hidden", markup=True),
+                Static(
+                    "[bold]Badge Options[/bold]",
+                    id="badges-section",
+                    classes="section-header hidden",
+                    markup=True,
+                ),
                 Horizontal(
                     Label("Style:", classes="field-label"),
                     RadioSet(
@@ -162,10 +186,16 @@ class ActionModal(ModalScreen[ActionResult | None]):
                     ),
                     classes="field-row",
                 ),
-                Checkbox("Apply to README files", id="badges-apply", classes="hidden-option"),
-
+                Checkbox(
+                    "Apply to README files", id="badges-apply", classes="hidden-option"
+                ),
                 # Health options
-                Static("[bold]Health Check Options[/bold]", id="health-section", classes="section-header hidden", markup=True),
+                Static(
+                    "[bold]Health Check Options[/bold]",
+                    id="health-section",
+                    classes="section-header hidden",
+                    markup=True,
+                ),
                 Horizontal(
                     Label("Rule set:", classes="field-label"),
                     RadioSet(
@@ -177,13 +207,19 @@ class ActionModal(ModalScreen[ActionResult | None]):
                     ),
                     classes="field-row",
                 ),
-
                 # README options
-                Static("[bold]README Options[/bold]", id="readme-section", classes="section-header hidden", markup=True),
+                Static(
+                    "[bold]README Options[/bold]",
+                    id="readme-section",
+                    classes="section-header hidden",
+                    markup=True,
+                ),
                 Horizontal(
                     Label("Model:", classes="field-label"),
                     RadioSet(
-                        RadioButton("Haiku (fast)", id="readme-model-haiku", value=True),
+                        RadioButton(
+                            "Haiku (fast)", id="readme-model-haiku", value=True
+                        ),
                         RadioButton("Sonnet (balanced)", id="readme-model-sonnet"),
                         RadioButton("Opus (best)", id="readme-model-opus"),
                         id="readme-model",
@@ -191,10 +227,18 @@ class ActionModal(ModalScreen[ActionResult | None]):
                     ),
                     classes="field-row",
                 ),
-                Checkbox("Force update all READMEs", id="readme-force", classes="hidden-option"),
-
+                Checkbox(
+                    "Force update all READMEs",
+                    id="readme-force",
+                    classes="hidden-option",
+                ),
                 # License options
-                Static("[bold]License Options[/bold]", id="license-section", classes="section-header hidden", markup=True),
+                Static(
+                    "[bold]License Options[/bold]",
+                    id="license-section",
+                    classes="section-header hidden",
+                    markup=True,
+                ),
                 Horizontal(
                     Label("License:", classes="field-label"),
                     RadioSet(
@@ -207,8 +251,11 @@ class ActionModal(ModalScreen[ActionResult | None]):
                     ),
                     classes="field-row",
                 ),
-                Checkbox("Replace existing licenses", id="license-force", classes="hidden-option"),
-
+                Checkbox(
+                    "Replace existing licenses",
+                    id="license-force",
+                    classes="hidden-option",
+                ),
                 id="action-scroll",
                 classes="action-form",
             ),
@@ -398,7 +445,9 @@ class ActionModal(ModalScreen[ActionResult | None]):
         if "describe" in actions:
             options["describe_model"] = self._get_model_name("describe-model")
             try:
-                options["describe_force"] = self.query_one("#describe-force", Checkbox).value
+                options["describe_force"] = self.query_one(
+                    "#describe-force", Checkbox
+                ).value
             except Exception:
                 options["describe_force"] = False
 
@@ -418,7 +467,9 @@ class ActionModal(ModalScreen[ActionResult | None]):
         if "badges" in actions:
             options["badges_style"] = self._get_badge_style()
             try:
-                options["badges_apply"] = self.query_one("#badges-apply", Checkbox).value
+                options["badges_apply"] = self.query_one(
+                    "#badges-apply", Checkbox
+                ).value
             except Exception:
                 options["badges_apply"] = False
 
@@ -430,7 +481,9 @@ class ActionModal(ModalScreen[ActionResult | None]):
         if "readme" in actions:
             options["readme_model"] = self._get_model_name("readme-model")
             try:
-                options["readme_force"] = self.query_one("#readme-force", Checkbox).value
+                options["readme_force"] = self.query_one(
+                    "#readme-force", Checkbox
+                ).value
             except Exception:
                 options["readme_force"] = False
 
@@ -438,7 +491,9 @@ class ActionModal(ModalScreen[ActionResult | None]):
         if "license" in actions:
             options["license_type"] = self._get_license_type()
             try:
-                options["license_force"] = self.query_one("#license-force", Checkbox).value
+                options["license_force"] = self.query_one(
+                    "#license-force", Checkbox
+                ).value
             except Exception:
                 options["license_force"] = False
 

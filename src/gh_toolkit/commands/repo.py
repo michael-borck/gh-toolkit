@@ -436,18 +436,24 @@ def health_check(
         elif repos_input.endswith("/*"):
             # Wildcard pattern: fetch all repos for user/org
             owner = repos_input[:-2]
-            console.print(f"[blue]🔍 Fetching all repositories for user/org: {owner}[/blue]")
+            console.print(
+                f"[blue]🔍 Fetching all repositories for user/org: {owner}[/blue]"
+            )
 
             # Check if this is the authenticated user (to include private repos)
             authenticated_user = client.get_authenticated_user()
             if authenticated_user and authenticated_user.lower() == owner.lower():
                 console.print("[dim]Including private repositories[/dim]")
-                user_repos = client.get_user_repos(None, visibility="all", affiliation="owner")
+                user_repos = client.get_user_repos(
+                    None, visibility="all", affiliation="owner"
+                )
             else:
                 user_repos = client.get_user_repos(owner)
 
             repo_list = [f"{owner}/{r['name']}" for r in user_repos]
-            console.print(f"[green]✓ Found {len(repo_list)} repositories for {owner}[/green]\n")
+            console.print(
+                f"[green]✓ Found {len(repo_list)} repositories for {owner}[/green]\n"
+            )
         else:
             # Single repository
             if "/" not in repos_input:
@@ -1032,9 +1038,7 @@ def describe_repos(
             raise typer.Exit(1)
 
         # Show what we're about to do
-        console.print(
-            f"\n[blue]Found {len(repo_list)} repositories to process[/blue]"
-        )
+        console.print(f"\n[blue]Found {len(repo_list)} repositories to process[/blue]")
         console.print(f"[blue]Using model: {model}[/blue]")
         if dry_run:
             console.print("[yellow]DRY RUN MODE - No changes will be made[/yellow]")
@@ -1084,9 +1088,7 @@ def _parse_describe_repos_input(
     # Check if it's a wildcard pattern (user/*)
     if repos_input.endswith("/*"):
         owner = repos_input[:-2]
-        console.print(
-            f"[blue]Fetching all repositories for user/org: {owner}[/blue]"
-        )
+        console.print(f"[blue]Fetching all repositories for user/org: {owner}[/blue]")
         try:
             # Check if owner is the authenticated user - if so, include private repos
             authenticated_user = client.get_authenticated_user()
@@ -1098,9 +1100,7 @@ def _parse_describe_repos_input(
             else:
                 user_repos = client.get_user_repos(owner)
             repos = [(owner, repo["name"]) for repo in user_repos]
-            console.print(
-                f"[green]Found {len(repos)} repositories for {owner}[/green]"
-            )
+            console.print(f"[green]Found {len(repos)} repositories for {owner}[/green]")
             return repos
         except Exception as e:
             console.print(f"[red]Error fetching repositories for {owner}: {e}[/red]")
@@ -1345,7 +1345,9 @@ def generate_badges(
             authenticated_user = client.get_authenticated_user()
             if authenticated_user and authenticated_user.lower() == owner.lower():
                 console.print("[dim]Including private repositories[/dim]")
-                repos = client.get_user_repos(None, visibility="all", affiliation="owner")
+                repos = client.get_user_repos(
+                    None, visibility="all", affiliation="owner"
+                )
             else:
                 repos = client.get_user_repos(owner)
             repo_list = [(owner, repo["name"]) for repo in repos]
@@ -1367,7 +1369,9 @@ def generate_badges(
                 topics = client.get_repo_topics(owner, repo)
 
                 if not topics:
-                    console.print(f"[yellow]  No topics found for {owner}/{repo}[/yellow]")
+                    console.print(
+                        f"[yellow]  No topics found for {owner}/{repo}[/yellow]"
+                    )
                     continue
 
                 # Limit topics
@@ -1387,7 +1391,7 @@ def generate_badges(
                 if apply:
                     _apply_badges_to_readme(client, owner, repo, badge_line)
                 else:
-                    console.print(f"\n[dim]Markdown:[/dim]")
+                    console.print("\n[dim]Markdown:[/dim]")
                     # Use markup=False to avoid rich interpreting markdown brackets
                     console.print(badge_line, markup=False)
 
@@ -1409,9 +1413,8 @@ def generate_badges(
         if clipboard:
             try:
                 import subprocess
-                process = subprocess.Popen(
-                    ["pbcopy"], stdin=subprocess.PIPE, text=True
-                )
+
+                process = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE, text=True)
                 process.communicate(input=combined_output)
                 console.print("\n[green]Copied to clipboard![/green]")
             except Exception as e:
@@ -1419,10 +1422,10 @@ def generate_badges(
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Operation cancelled[/yellow]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 def _apply_badges_to_readme(
@@ -1505,7 +1508,7 @@ def _apply_badges_to_readme(
 
     # Check if content actually changed
     if new_content == current_content:
-        console.print(f"[dim]  README already up to date[/dim]")
+        console.print("[dim]  README already up to date[/dim]")
         return True
 
     # Update the file
@@ -1514,7 +1517,7 @@ def _apply_badges_to_readme(
         repo=repo,
         path=readme_path,
         content=new_content,
-        message=f"Update README badges\n\nAuto-generated by gh-toolkit",
+        message="Update README badges\n\nAuto-generated by gh-toolkit",
         sha=sha,
     )
 
@@ -1611,9 +1614,7 @@ def readme_repos(
             )
 
         client = GitHubClient(github_token)
-        generator = RepoReadmeGenerator(
-            client, anthropic_api_key, rate_limit, model
-        )
+        generator = RepoReadmeGenerator(client, anthropic_api_key, rate_limit, model)
 
         # Parse repository input
         repo_list = _parse_readme_repos_input(repos_input, client)
@@ -1652,8 +1653,12 @@ def readme_repos(
 
         # Update tags for modified repos if requested
         if update_tags and updated_repos and not dry_run:
-            console.print(f"\n[blue]Updating tags for {len(updated_repos)} modified repositories...[/blue]")
-            _update_tags_for_repos(updated_repos, client, anthropic_api_key, model, rate_limit)
+            console.print(
+                f"\n[blue]Updating tags for {len(updated_repos)} modified repositories...[/blue]"
+            )
+            _update_tags_for_repos(
+                updated_repos, client, anthropic_api_key, model, rate_limit
+            )
 
         # Return the list of updated repos (useful for chaining)
         return updated_repos  # type: ignore[return-value]
@@ -1684,7 +1689,9 @@ def _parse_readme_repos_input(
                         if len(parts) == 2:
                             repos.append((parts[0], parts[1]))
                         else:
-                            console.print(f"[yellow]Line {line_num}: Invalid format[/yellow]")
+                            console.print(
+                                f"[yellow]Line {line_num}: Invalid format[/yellow]"
+                            )
                     except Exception as e:
                         console.print(f"[yellow]Line {line_num}: {e}[/yellow]")
         return repos
@@ -1735,7 +1742,9 @@ def _show_readme_summary(results: list[dict[str, Any]], dry_run: bool) -> None:
     table.add_column("Description")
 
     if dry_run:
-        table.add_row("Would Update", str(would_update), "READMEs that would be updated")
+        table.add_row(
+            "Would Update", str(would_update), "READMEs that would be updated"
+        )
     else:
         table.add_row("Updated", str(updated), "READMEs successfully updated")
 
@@ -1759,7 +1768,7 @@ def _save_readme_results(results: list[dict[str, Any]], output_path: str) -> Non
     import json
 
     # Remove generated content from saved results (too large)
-    save_results = []
+    save_results: list[dict[str, Any]] = []
     for r in results:
         save_r = {k: v for k, v in r.items() if k != "generated_content"}
         save_results.append(save_r)
@@ -1789,7 +1798,9 @@ def _update_tags_for_repos(
             result = tagger.process_repository(owner, repo, dry_run=False, force=True)
             if result.get("status") == "updated":
                 topics = result.get("new_topics", [])
-                console.print(f"[green]  ✓ Updated topics: {', '.join(topics[:5])}[/green]")
+                console.print(
+                    f"[green]  ✓ Updated topics: {', '.join(topics[:5])}[/green]"
+                )
             elif result.get("status") == "skipped":
                 console.print("[dim]  Skipped (already has topics)[/dim]")
             else:
@@ -1801,7 +1812,7 @@ def _update_tags_for_repos(
 def license_repos(
     repos_input: str | None = typer.Argument(
         None,
-        help="Repository (owner/repo), file with repo list, or 'username/*' for all user repos"
+        help="Repository (owner/repo), file with repo list, or 'username/*' for all user repos",
     ),
     token: str | None = typer.Option(
         None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)"
@@ -1877,12 +1888,16 @@ def license_repos(
                 table.add_row(key, desc)
 
         console.print(table)
-        console.print("\n[dim]Use any GitHub license key (see: https://choosealicense.com)[/dim]")
+        console.print(
+            "\n[dim]Use any GitHub license key (see: https://choosealicense.com)[/dim]"
+        )
         return
 
     # Require repos_input if not listing
     if not repos_input:
-        console.print("[red]Error: REPOS_INPUT is required (use --list to see available licenses)[/red]")
+        console.print(
+            "[red]Error: REPOS_INPUT is required (use --list to see available licenses)[/red]"
+        )
         raise typer.Exit(1)
 
     try:
@@ -1912,7 +1927,9 @@ def license_repos(
         if dry_run:
             console.print("[yellow]DRY RUN MODE - No changes will be made[/yellow]")
         if force:
-            console.print("[yellow]FORCE MODE - Will replace existing licenses[/yellow]")
+            console.print(
+                "[yellow]FORCE MODE - Will replace existing licenses[/yellow]"
+            )
 
         # Process repositories
         results = manager.process_multiple_repositories(
@@ -1952,7 +1969,9 @@ def _parse_license_repos_input(
                         if len(parts) == 2:
                             repos.append((parts[0], parts[1]))
                         else:
-                            console.print(f"[yellow]Line {line_num}: Invalid format[/yellow]")
+                            console.print(
+                                f"[yellow]Line {line_num}: Invalid format[/yellow]"
+                            )
                     except Exception as e:
                         console.print(f"[yellow]Line {line_num}: {e}[/yellow]")
         return repos
@@ -2029,7 +2048,7 @@ def _save_license_results(results: list[dict[str, Any]], output_path: str) -> No
     import json
 
     # Remove content preview from saved results
-    save_results = []
+    save_results: list[dict[str, Any]] = []
     for r in results:
         save_r = {k: v for k, v in r.items() if k != "content_preview"}
         save_results.append(save_r)

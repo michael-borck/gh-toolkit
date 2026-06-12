@@ -1,7 +1,5 @@
 """Unit tests for PortfolioGenerator."""
 
-import json
-
 import pytest
 import responses
 
@@ -173,7 +171,9 @@ class TestPortfolioGenerator:
         assert all("category" in r for r in repos)
 
     @responses.activate
-    def test_aggregate_repos_include_forks(self, mock_github_token, sample_multi_org_repos):
+    def test_aggregate_repos_include_forks(
+        self, mock_github_token, sample_multi_org_repos
+    ):
         """Test aggregating repositories including forks."""
         responses.add(
             responses.GET,
@@ -233,7 +233,9 @@ class TestPortfolioGenerator:
         assert all(r["stargazers_count"] >= 100 for r in repos)
 
     @responses.activate
-    def test_aggregate_repos_sorted_by_stars(self, mock_github_token, sample_multi_org_repos):
+    def test_aggregate_repos_sorted_by_stars(
+        self, mock_github_token, sample_multi_org_repos
+    ):
         """Test that aggregated repositories are sorted by stars."""
         responses.add(
             responses.GET,

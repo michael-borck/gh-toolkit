@@ -103,16 +103,16 @@ class PortfolioGenerator:
         # Sort by stars
         all_repos.sort(key=lambda x: x.get("stargazers_count", 0), reverse=True)
 
-        console.print(f"[green]Aggregated {len(all_repos)} repositories from {len(org_names)} organizations[/green]")
+        console.print(
+            f"[green]Aggregated {len(all_repos)} repositories from {len(org_names)} organizations[/green]"
+        )
         return all_repos
 
     def _infer_category(self, repo: dict[str, Any]) -> str:
         """Infer a category for a repository."""
         return self._readme_generator.infer_category(repo)
 
-    def audit_repos(
-        self, repos: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    def audit_repos(self, repos: list[dict[str, Any]]) -> dict[str, Any]:
         """Audit repositories for missing descriptions, README, topics, or license.
 
         Args:
@@ -136,35 +136,41 @@ class PortfolioGenerator:
 
             # Check for missing description
             if not repo.get("description"):
-                issues.append({
-                    "repo": repo_name,
-                    "org": source_org,
-                    "issue_type": "missing_description",
-                    "severity": "error",
-                    "suggestion": "Add a clear, concise description explaining what this repository does",
-                })
+                issues.append(
+                    {
+                        "repo": repo_name,
+                        "org": source_org,
+                        "issue_type": "missing_description",
+                        "severity": "error",
+                        "suggestion": "Add a clear, concise description explaining what this repository does",
+                    }
+                )
                 issue_counts["missing_description"] += 1
 
             # Check for missing topics
             if not repo.get("topics"):
-                issues.append({
-                    "repo": repo_name,
-                    "org": source_org,
-                    "issue_type": "missing_topics",
-                    "severity": "warning",
-                    "suggestion": "Add relevant topic tags to improve discoverability",
-                })
+                issues.append(
+                    {
+                        "repo": repo_name,
+                        "org": source_org,
+                        "issue_type": "missing_topics",
+                        "severity": "warning",
+                        "suggestion": "Add relevant topic tags to improve discoverability",
+                    }
+                )
                 issue_counts["missing_topics"] += 1
 
             # Check for missing license
             if not repo.get("license"):
-                issues.append({
-                    "repo": repo_name,
-                    "org": source_org,
-                    "issue_type": "missing_license",
-                    "severity": "warning",
-                    "suggestion": "Add a license to clarify usage terms",
-                })
+                issues.append(
+                    {
+                        "repo": repo_name,
+                        "org": source_org,
+                        "issue_type": "missing_license",
+                        "severity": "warning",
+                        "suggestion": "Add a license to clarify usage terms",
+                    }
+                )
                 issue_counts["missing_license"] += 1
 
         repos_with_issues = len({issue["repo"] for issue in issues})
@@ -176,7 +182,9 @@ class PortfolioGenerator:
             "summary": issue_counts,
         }
 
-        console.print(f"[yellow]Found {len(issues)} issues in {repos_with_issues} repositories[/yellow]")
+        console.print(
+            f"[yellow]Found {len(issues)} issues in {repos_with_issues} repositories[/yellow]"
+        )
         return report
 
     def generate_readme(
@@ -237,7 +245,9 @@ class PortfolioGenerator:
 
             for repo in group_repos:
                 name = repo.get("name", "")
-                desc = (repo.get("description") or "No description").replace("|", "\\|")[:50]
+                desc = (repo.get("description") or "No description").replace(
+                    "|", "\\|"
+                )[:50]
                 if len(repo.get("description") or "") > 50:
                     desc += "..."
                 category = repo.get("category", "Other")
@@ -326,30 +336,34 @@ class PortfolioGenerator:
         # Transform repos to match SiteGenerator expected format
         transformed_repos: list[dict[str, Any]] = []
         for repo in repos:
-            transformed_repos.append({
-                "name": repo.get("name", ""),
-                "full_name": repo.get("full_name", ""),
-                "description": repo.get("description"),
-                "url": repo.get("html_url", ""),
-                "homepage": repo.get("homepage"),
-                "stars": repo.get("stargazers_count", 0),
-                "forks": repo.get("forks_count", 0),
-                "watchers": repo.get("watchers_count", 0),
-                "language": repo.get("language"),
-                "languages": [repo.get("language")] if repo.get("language") else [],
-                "topics": repo.get("topics", []),
-                "license": repo["license"].get("spdx_id") if repo.get("license") else None,
-                "private": repo.get("private", False),
-                "archived": repo.get("archived", False),
-                "fork": repo.get("fork", False),
-                "category": repo.get("category", "Other"),
-                "category_confidence": 0.8,
-                "category_reason": "Inferred from repository characteristics",
-                "has_pages": repo.get("has_pages", False),
-                "pages_url": None,
-                "download_links": {},
-                "latest_version": None,
-            })
+            transformed_repos.append(
+                {
+                    "name": repo.get("name", ""),
+                    "full_name": repo.get("full_name", ""),
+                    "description": repo.get("description"),
+                    "url": repo.get("html_url", ""),
+                    "homepage": repo.get("homepage"),
+                    "stars": repo.get("stargazers_count", 0),
+                    "forks": repo.get("forks_count", 0),
+                    "watchers": repo.get("watchers_count", 0),
+                    "language": repo.get("language"),
+                    "languages": [repo.get("language")] if repo.get("language") else [],
+                    "topics": repo.get("topics", []),
+                    "license": repo["license"].get("spdx_id")
+                    if repo.get("license")
+                    else None,
+                    "private": repo.get("private", False),
+                    "archived": repo.get("archived", False),
+                    "fork": repo.get("fork", False),
+                    "category": repo.get("category", "Other"),
+                    "category_confidence": 0.8,
+                    "category_reason": "Inferred from repository characteristics",
+                    "has_pages": repo.get("has_pages", False),
+                    "pages_url": None,
+                    "download_links": {},
+                    "latest_version": None,
+                }
+            )
 
         # Use SiteGenerator
         generator = SiteGenerator()
@@ -419,7 +433,9 @@ class PortfolioGenerator:
         for issue_type, count in report["summary"].items():
             if count > 0:
                 icon = "[red]!" if "description" in issue_type else "[yellow]*"
-                console.print(f"  {icon}[/] {issue_type.replace('_', ' ').title()}: {count}")
+                console.print(
+                    f"  {icon}[/] {issue_type.replace('_', ' ').title()}: {count}"
+                )
         console.print("")
 
         # Details by severity
@@ -429,7 +445,9 @@ class PortfolioGenerator:
         if errors:
             console.print("[bold red]Errors (should fix):[/bold red]")
             for issue in errors[:10]:  # Limit output
-                console.print(f"  [red]![/red] {issue['repo']}: {issue['issue_type'].replace('_', ' ')}")
+                console.print(
+                    f"  [red]![/red] {issue['repo']}: {issue['issue_type'].replace('_', ' ')}"
+                )
             if len(errors) > 10:
                 console.print(f"  ... and {len(errors) - 10} more errors")
             console.print("")
@@ -437,7 +455,9 @@ class PortfolioGenerator:
         if warnings:
             console.print("[bold yellow]Warnings (recommended fixes):[/bold yellow]")
             for issue in warnings[:10]:  # Limit output
-                console.print(f"  [yellow]*[/yellow] {issue['repo']}: {issue['issue_type'].replace('_', ' ')}")
+                console.print(
+                    f"  [yellow]*[/yellow] {issue['repo']}: {issue['issue_type'].replace('_', ' ')}"
+                )
             if len(warnings) > 10:
                 console.print(f"  ... and {len(warnings) - 10} more warnings")
 

@@ -69,7 +69,11 @@ class HomeScreen(Screen[None]):
         """Compose the home screen."""
         yield Vertical(
             Static("Organizations", classes="screen-title"),
-            Input(placeholder="Search organizations...", id="search-input", classes="search-input hidden"),
+            Input(
+                placeholder="Search organizations...",
+                id="search-input",
+                classes="search-input hidden",
+            ),
             Static("Loading...", id="stats-bar", classes="stats-bar"),
             ListView(id="org-list", classes="org-list"),
             classes="content",
@@ -177,7 +181,8 @@ class HomeScreen(Screen[None]):
         # Determine which orgs to process
         if self._selected_orgs:
             target_orgs = [
-                org for org in (self._filtered_orgs if self._filtered_orgs else self._orgs)
+                org
+                for org in (self._filtered_orgs if self._filtered_orgs else self._orgs)
                 if org.get("login", "") in self._selected_orgs
             ]
             scope_desc = f"repos in {len(target_orgs)} selected orgs"
@@ -203,7 +208,11 @@ class HomeScreen(Screen[None]):
                 pass  # Skip orgs we can't access
 
         if not all_repos:
-            self.app.notify("No repositories found in selected organizations", severity="warning", timeout=2)
+            self.app.notify(
+                "No repositories found in selected organizations",
+                severity="warning",
+                timeout=2,
+            )
             return
 
         def handle_result(result: Any) -> None:
@@ -280,7 +289,8 @@ class HomeScreen(Screen[None]):
         # Filter orgs by login or description
         query_lower = query.lower()
         self._filtered_orgs = [
-            org for org in self._orgs
+            org
+            for org in self._orgs
             if query_lower in org.get("login", "").lower()
             or query_lower in (org.get("description") or "").lower()
         ]

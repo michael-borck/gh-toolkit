@@ -8,7 +8,6 @@ from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
-
 HELP_TEXT = """\
 [bold cyan]gh-toolkit TUI[/bold cyan]
 A terminal interface for managing GitHub repositories.

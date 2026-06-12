@@ -152,7 +152,10 @@ class ActionExecutor:
 
         client = GitHubClient(self.github_token)
         style = action_result.options.get("badges_style", "flat-square")
-        apply = action_result.options.get("badges_apply", False) and not action_result.dry_run
+        apply = (
+            action_result.options.get("badges_apply", False)
+            and not action_result.dry_run
+        )
 
         results = []
         success_count = 0
@@ -162,43 +165,53 @@ class ActionExecutor:
             try:
                 topics = client.get_repo_topics(owner, repo)
                 if not topics:
-                    results.append({
-                        "repo": f"{owner}/{repo}",
-                        "status": "skipped",
-                        "message": "No topics found",
-                    })
+                    results.append(
+                        {
+                            "repo": f"{owner}/{repo}",
+                            "status": "skipped",
+                            "message": "No topics found",
+                        }
+                    )
                     continue
 
                 # Limit to 10 topics
                 topics = topics[:10]
 
                 # Generate badges
-                badges = [generate_badge_markdown(topic, style, True) for topic in topics]
+                badges = [
+                    generate_badge_markdown(topic, style, True) for topic in topics
+                ]
                 badge_line = " ".join(badges)
 
                 if apply:
                     _apply_badges_to_readme(client, owner, repo, badge_line)
-                    results.append({
-                        "repo": f"{owner}/{repo}",
-                        "status": "success",
-                        "message": f"Applied {len(badges)} badges",
-                        "badges": badge_line,
-                    })
+                    results.append(
+                        {
+                            "repo": f"{owner}/{repo}",
+                            "status": "success",
+                            "message": f"Applied {len(badges)} badges",
+                            "badges": badge_line,
+                        }
+                    )
                 else:
-                    results.append({
-                        "repo": f"{owner}/{repo}",
-                        "status": "dry_run" if action_result.dry_run else "success",
-                        "message": f"Generated {len(badges)} badges",
-                        "badges": badge_line,
-                    })
+                    results.append(
+                        {
+                            "repo": f"{owner}/{repo}",
+                            "status": "dry_run" if action_result.dry_run else "success",
+                            "message": f"Generated {len(badges)} badges",
+                            "badges": badge_line,
+                        }
+                    )
                 success_count += 1
 
             except Exception as e:
-                results.append({
-                    "repo": f"{owner}/{repo}",
-                    "status": "error",
-                    "message": str(e),
-                })
+                results.append(
+                    {
+                        "repo": f"{owner}/{repo}",
+                        "status": "error",
+                        "message": str(e),
+                    }
+                )
                 error_count += 1
 
         return ExecutionResult(
@@ -222,20 +235,24 @@ class ActionExecutor:
         for owner, repo in action_result.repos:
             try:
                 report = checker.check_repository(owner, repo)
-                results.append({
-                    "repo": f"{owner}/{repo}",
-                    "status": "success",
-                    "score": report.overall_score,
-                    "grade": report.grade,
-                    "passed": report.passed_checks,
-                    "failed": report.failed_checks,
-                })
+                results.append(
+                    {
+                        "repo": f"{owner}/{repo}",
+                        "status": "success",
+                        "score": report.overall_score,
+                        "grade": report.grade,
+                        "passed": report.passed_checks,
+                        "failed": report.failed_checks,
+                    }
+                )
             except Exception as e:
-                results.append({
-                    "repo": f"{owner}/{repo}",
-                    "status": "error",
-                    "message": str(e),
-                })
+                results.append(
+                    {
+                        "repo": f"{owner}/{repo}",
+                        "status": "error",
+                        "message": str(e),
+                    }
+                )
 
         success = len([r for r in results if r.get("status") == "success"])
         errors = len([r for r in results if r.get("status") == "error"])
@@ -278,24 +295,30 @@ class ActionExecutor:
 
                 if repo_issues:
                     issues_found += 1
-                    results.append({
-                        "repo": f"{owner}/{repo}",
-                        "status": "issues_found",
-                        "issues": repo_issues,
-                    })
+                    results.append(
+                        {
+                            "repo": f"{owner}/{repo}",
+                            "status": "issues_found",
+                            "issues": repo_issues,
+                        }
+                    )
                 else:
-                    results.append({
-                        "repo": f"{owner}/{repo}",
-                        "status": "success",
-                        "issues": [],
-                    })
+                    results.append(
+                        {
+                            "repo": f"{owner}/{repo}",
+                            "status": "success",
+                            "issues": [],
+                        }
+                    )
 
             except Exception as e:
-                results.append({
-                    "repo": f"{owner}/{repo}",
-                    "status": "error",
-                    "message": str(e),
-                })
+                results.append(
+                    {
+                        "repo": f"{owner}/{repo}",
+                        "status": "error",
+                        "message": str(e),
+                    }
+                )
 
         return ExecutionResult(
             action="audit",

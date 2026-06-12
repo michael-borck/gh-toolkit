@@ -182,9 +182,27 @@ class TestSiteGenerator:
     def test_generate_repo_cards_sorting(self):
         """Test repository cards are sorted by stars."""
         repos = [
-            {"name": "low-stars", "stars": 5, "stargazers_count": 5, "forks": 1},
-            {"name": "high-stars", "stars": 100, "stargazers_count": 100, "forks": 20},
-            {"name": "medium-stars", "stars": 50, "stargazers_count": 50, "forks": 10},
+            {
+                "name": "low-stars",
+                "url": "https://github.com/user/low-stars",
+                "stars": 5,
+                "stargazers_count": 5,
+                "forks": 1,
+            },
+            {
+                "name": "high-stars",
+                "url": "https://github.com/user/high-stars",
+                "stars": 100,
+                "stargazers_count": 100,
+                "forks": 20,
+            },
+            {
+                "name": "medium-stars",
+                "url": "https://github.com/user/medium-stars",
+                "stars": 50,
+                "stargazers_count": 50,
+                "forks": 10,
+            },
         ]
 
         generator = SiteGenerator()
@@ -272,12 +290,55 @@ class TestSiteGenerator:
             assert "<html" in content
             assert "</html>" in content
             assert "<head>" in content
-            assert "<body>" in content
+            assert "<body" in content
 
             # Theme-specific content
             theme_config = generator.themes[theme_name]
             assert theme_config["title"] in content
             assert theme_config["description"] in content
+
+    def test_repo_content_is_html_escaped(self, tmp_path):
+        """Repo-supplied text and URLs must not inject HTML/JS into the site."""
+        repos = [
+            {
+                "name": "evil<img src=x onerror=alert(1)>",
+                "description": '"><script>alert(2)</script>',
+                "url": "javascript:alert(3)",
+                "homepage": "javascript:alert(4)",
+                "pages_url": "https://ok.github.io/x/",
+                "stars": 1,
+                "forks": 1,
+                "category": "Other Tool'); alert(5); //",
+                "topics": ["<b>topic</b>"],
+                "languages": ["<i>Py</i>"],
+                "license": "<u>MIT</u>",
+                "download_links": {"windows": "javascript:alert(6)"},
+                "latest_version": {"tag": "<svg onload=alert(7)>"},
+            }
+        ]
+
+        generator = SiteGenerator()
+        output_file = tmp_path / "xss_site.html"
+        generator.generate_site(repos, theme="portfolio", output_file=str(output_file))
+
+        content = output_file.read_text()
+
+        for payload in [
+            "<img src=x",
+            "<script>alert(2)",
+            'href="javascript:',
+            "alert(5); //')",
+            "<svg onload",
+            "<b>topic</b>",
+            "<i>Py</i>",
+            "<u>MIT</u>",
+        ]:
+            assert payload not in content
+
+        # Escaped text is still rendered; unsafe URLs are defanged to '#'
+        assert "&lt;img src=x" in content
+        assert 'href="#"' in content
+        assert 'href="https://ok.github.io/x/"' in content
 
     def test_category_icons(self, sample_extracted_repos):
         """Test category icons are properly included."""
@@ -298,6 +359,7 @@ class TestSiteGenerator:
         repos = [
             {
                 "name": "low-confidence-repo",
+                "url": "https://github.com/user/low-confidence-repo",
                 "description": "Test repo",
                 "category_confidence": 0.7,  # Below 0.8 threshold
                 "stars": 10,

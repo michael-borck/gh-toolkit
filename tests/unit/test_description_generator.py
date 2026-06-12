@@ -14,9 +14,7 @@ class TestDescriptionGenerator:
     ):
         """Test DescriptionGenerator initialization with Anthropic key."""
         # Patch where Anthropic is imported from, not where it's used
-        mock_anthropic_class = mocker.patch(
-            "anthropic.Anthropic"
-        )
+        mock_anthropic_class = mocker.patch("anthropic.Anthropic")
 
         client = GitHubClient(mock_github_token)
         generator = DescriptionGenerator(client, mock_anthropic_key)
@@ -108,7 +106,9 @@ class TestDescriptionGenerator:
         """Test successful LLM description generation."""
         mock_anthropic_client = mocker.Mock()
         mock_response = mocker.Mock()
-        mock_response.content = [mocker.Mock(text="Manage GitHub repositories efficiently")]
+        mock_response.content = [
+            mocker.Mock(text="Manage GitHub repositories efficiently")
+        ]
         mock_anthropic_client.messages.create.return_value = mock_response
 
         repo_data = {
@@ -144,9 +144,9 @@ class TestDescriptionGenerator:
         assert description == "A quoted description"
 
     def test_generate_with_llm_truncates_long(self, mock_github_token, mocker):
-        """Test that LLM response is truncated to 100 chars."""
+        """Test that LLM response is truncated to 250 chars."""
         mock_anthropic_client = mocker.Mock()
-        long_desc = "A" * 150  # 150 chars
+        long_desc = "A" * 300  # 300 chars
         mock_response = mocker.Mock()
         mock_response.content = [mocker.Mock(text=long_desc)]
         mock_anthropic_client.messages.create.return_value = mock_response
@@ -159,7 +159,7 @@ class TestDescriptionGenerator:
 
         description = generator._generate_with_llm(repo_data, "")
 
-        assert len(description) == 100
+        assert len(description) == 250
 
     def test_generate_with_llm_error_returns_none(self, mock_github_token, mocker):
         """Test that LLM errors return None."""

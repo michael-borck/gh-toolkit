@@ -418,9 +418,7 @@ class TestOrgReadmeGenerator:
         assert "## Stats" not in readme
 
     @responses.activate
-    def test_generate_readme_no_repos_error(
-        self, mock_github_token, sample_org_info
-    ):
+    def test_generate_readme_no_repos_error(self, mock_github_token, sample_org_info):
         """Test error when organization has no repositories."""
         responses.add(
             responses.GET,

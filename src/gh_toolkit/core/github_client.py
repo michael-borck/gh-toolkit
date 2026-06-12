@@ -132,6 +132,24 @@ class GitHubClient:
         except requests.exceptions.RequestException as e:
             raise GitHubAPIError(f"Request failed: {str(e)}") from e
 
+    def request(
+        self,
+        method: str,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
+        timeout: int = 30,
+    ) -> requests.Response:
+        """Make a raw request to a GitHub API endpoint.
+
+        Public entry point for callers that need endpoints without a
+        dedicated helper method. See _make_request for details.
+
+        Raises:
+            GitHubAPIError: If the request fails
+        """
+        return self._make_request(method, endpoint, params, json_data, timeout)
+
     def get_paginated(
         self,
         endpoint: str,

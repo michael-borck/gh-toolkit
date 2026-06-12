@@ -187,7 +187,13 @@ class RepoScreen(Screen[None]):
         health_results = self.query_one("#health-results", Static)
 
         # Build grade display
-        grade_colors = {"A": "\u2705", "B": "\u2705", "C": "\u26a0", "D": "\u26a0", "F": "\u26d4"}
+        grade_colors = {
+            "A": "\u2705",
+            "B": "\u2705",
+            "C": "\u26a0",
+            "D": "\u26a0",
+            "F": "\u26d4",
+        }
         grade_icon = grade_colors.get(report.grade, "")
 
         health_header.update(
@@ -205,7 +211,9 @@ class RepoScreen(Screen[None]):
             if check.category not in by_category:
                 by_category[check.category] = []
             icon = "\u2705" if check.passed else "\u274c"
-            by_category[check.category].append(f"  {icon} {check.name}: {check.message}")
+            by_category[check.category].append(
+                f"  {icon} {check.name}: {check.message}"
+            )
 
         for category, check_lines in by_category.items():
             lines.append(f"{category}:")

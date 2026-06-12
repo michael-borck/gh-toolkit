@@ -317,6 +317,12 @@ Please read our contributing guide.
         assert report.percentage > 70  # Should score well with good sample data
         assert report.grade in ["A", "B"]
 
+    def test_fetch_repository_data_invalid_format(self, health_checker):
+        """Malformed repo names raise a clear error instead of ValueError on unpack."""
+        for bad_name in ["owner/sub/repo", "just-a-name", "", "owner//"]:
+            with pytest.raises(ValueError, match="expected 'owner/repo'"):
+                health_checker._fetch_repository_data(bad_name)
+
     def test_generate_summary(self, health_checker, sample_repo_data):
         """Test summary generation."""
         # Create some mock checks

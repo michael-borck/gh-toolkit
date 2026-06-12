@@ -114,7 +114,12 @@ class RepositoryHealthChecker:
 
     def _fetch_repository_data(self, repo_full_name: str) -> dict[str, Any]:
         """Fetch repository data from GitHub API."""
-        owner, repo = repo_full_name.split("/")
+        parts = [p for p in repo_full_name.strip().split("/") if p]
+        if len(parts) != 2:
+            raise ValueError(
+                f"Invalid repository name '{repo_full_name}': expected 'owner/repo'"
+            )
+        owner, repo = parts
 
         # Get basic repository info
         repo_data = self.client.get_repo_info(owner, repo)
@@ -129,12 +134,10 @@ class RepositoryHealthChecker:
             repo_data["readme_size"] = 0
 
         # Get repository contents for structure analysis
-        # Note: Using _make_request directly instead of get_paginated to avoid
+        # Note: Using request() directly instead of get_paginated to avoid
         # progress bar issues; root contents are rarely paginated anyway
         try:
-            response = self.client._make_request(
-                "GET", f"/repos/{owner}/{repo}/contents"
-            )
+            response = self.client.request("GET", f"/repos/{owner}/{repo}/contents")
             contents = response.json()
             repo_data["root_files"] = [
                 item["name"] for item in contents if item["type"] == "file"
@@ -150,7 +153,7 @@ class RepositoryHealthChecker:
         # Note: /actions/workflows returns {"total_count": N, "workflows": [...]}
         # not a list, so we can't use get_paginated
         try:
-            response = self.client._make_request(
+            response = self.client.request(
                 "GET", f"/repos/{owner}/{repo}/actions/workflows"
             )
             workflows_data = response.json()

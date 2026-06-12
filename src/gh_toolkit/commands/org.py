@@ -91,7 +91,9 @@ def readme(
         # Get tokens
         github_token = token or os.environ.get("GITHUB_TOKEN")
         if not github_token:
-            console.print("[red]Error: GitHub token required. Set GITHUB_TOKEN or use --token[/red]")
+            console.print(
+                "[red]Error: GitHub token required. Set GITHUB_TOKEN or use --token[/red]"
+            )
             raise typer.Exit(1)
 
         anthropic_api_key = anthropic_key or os.environ.get("ANTHROPIC_API_KEY")
@@ -99,13 +101,17 @@ def readme(
         # Validate template
         valid_templates = ["default", "minimal", "detailed"]
         if template not in valid_templates:
-            console.print(f"[red]Error: Invalid template '{template}'. Choose from: {', '.join(valid_templates)}[/red]")
+            console.print(
+                f"[red]Error: Invalid template '{template}'. Choose from: {', '.join(valid_templates)}[/red]"
+            )
             raise typer.Exit(1)
 
         # Validate group_by
         valid_group_by = ["category", "language", "topic"]
         if group_by not in valid_group_by:
-            console.print(f"[red]Error: Invalid group-by '{group_by}'. Choose from: {', '.join(valid_group_by)}[/red]")
+            console.print(
+                f"[red]Error: Invalid group-by '{group_by}'. Choose from: {', '.join(valid_group_by)}[/red]"
+            )
             raise typer.Exit(1)
 
         # Initialize client and generator
@@ -126,7 +132,9 @@ def readme(
         )
 
         if dry_run:
-            console.print("\n[yellow]--- DRY RUN: Preview of generated README ---[/yellow]\n")
+            console.print(
+                "\n[yellow]--- DRY RUN: Preview of generated README ---[/yellow]\n"
+            )
             console.print(readme_content)
             console.print("\n[yellow]--- End of preview ---[/yellow]")
         elif apply:
@@ -178,7 +186,9 @@ def _apply_org_readme(client: GitHubClient, org_name: str, readme_content: str) 
         )
         if not result:
             console.print("[red]Failed to create .github repository[/red]")
-            console.print("[dim]Make sure you have admin permissions for this organization[/dim]")
+            console.print(
+                "[dim]Make sure you have admin permissions for this organization[/dim]"
+            )
             return False
         console.print(f"[green]Created {org_name}/.github repository[/green]")
 
@@ -188,7 +198,9 @@ def _apply_org_readme(client: GitHubClient, org_name: str, readme_content: str) 
     if existing_file:
         # File exists - check if we should merge or replace
         try:
-            existing_content = base64.b64decode(existing_file["content"]).decode("utf-8")
+            existing_content = base64.b64decode(existing_file["content"]).decode(
+                "utf-8"
+            )
             sha = existing_file["sha"]
 
             # Check if content is different
@@ -226,7 +238,9 @@ def _apply_org_readme(client: GitHubClient, org_name: str, readme_content: str) 
         )
 
     if result:
-        console.print(f"[green]Successfully updated {org_name}/.github/{readme_path}[/green]")
+        console.print(
+            f"[green]Successfully updated {org_name}/.github/{readme_path}[/green]"
+        )
         console.print(f"[blue]View at: https://github.com/{org_name}[/blue]")
         return True
     else:

@@ -1,12 +1,33 @@
 """Site generation for repository portfolios."""
 
+import re
 from datetime import datetime
+from html import escape
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from rich.console import Console
 
 console = Console()
+
+
+def _safe_url(url: Any) -> str:
+    """Return the URL escaped for an href attribute, or '#' if not http(s).
+
+    Repo metadata (homepage, release assets) is attacker-controllable, so
+    reject anything that isn't a plain http/https URL (e.g. javascript:).
+    """
+    if not url or not isinstance(url, str):
+        return "#"
+    if urlparse(url).scheme not in ("http", "https"):
+        return "#"
+    return escape(url, quote=True)
+
+
+def _category_id(category: str) -> str:
+    """Build a DOM/JS-safe category id (used inside onclick handlers)."""
+    return re.sub(r"[^a-z0-9-]", "", category.replace(" ", "-").lower())
 
 
 class SiteGenerator:
@@ -111,6 +132,9 @@ class SiteGenerator:
         description: str,
     ) -> str:
         """Generate complete HTML document."""
+        title = escape(title)
+        description = escape(description)
+
         # Start building HTML
         html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -189,8 +213,8 @@ class SiteGenerator:
         """Generate category filter buttons."""
         buttons: list[str] = []
         for cat, _ in categories:
-            cat_id = cat.replace(" ", "-").lower()
-            button = f'''<button onclick="filterByCategory('{cat_id}')" class="category-btn px-4 py-2 bg-{theme_config["accent_color"]}-100 text-{theme_config["accent_color"]}-700 rounded-full hover:bg-{theme_config["accent_color"]}-200 transition" data-category="{cat_id}">{cat}</button>'''
+            cat_id = _category_id(cat)
+            button = f'''<button onclick="filterByCategory('{cat_id}')" class="category-btn px-4 py-2 bg-{theme_config["accent_color"]}-100 text-{theme_config["accent_color"]}-700 rounded-full hover:bg-{theme_config["accent_color"]}-200 transition" data-category="{cat_id}">{escape(cat)}</button>'''
             buttons.append(button)
         return " ".join(buttons)
 
@@ -206,14 +230,14 @@ class SiteGenerator:
         category_icons = theme_config.get("category_icons", {})
 
         for category, cat_repos in categories:
-            cat_id = category.replace(" ", "-").lower()
+            cat_id = _category_id(category)
             icon = category_icons.get(category, "fa-folder")
 
             section = f'''
         <section id="{cat_id}" class="mb-16">
             <div class="flex items-center mb-8">
                 <i class="fas {icon} text-4xl text-{theme_config["accent_color"]}-600 mr-4"></i>
-                <h2 class="text-3xl font-bold text-gray-800">{category}</h2>
+                <h2 class="text-3xl font-bold text-gray-800">{escape(category)}</h2>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -241,14 +265,16 @@ class SiteGenerator:
         for repo in sorted_repos:
             repo_name = repo["name"]
             repo_meta = metadata.get(repo_name, {})
-            icon_emoji = repo_meta.get("icon", theme_config.get("default_icon", "🔧"))
+            icon_emoji = escape(
+                repo_meta.get("icon", theme_config.get("default_icon", "🔧"))
+            )
 
             # Build features list
             features_html = ""
             if "key_features" in repo_meta:
                 features_html = '<ul class="mt-2 space-y-1">'
                 for feature in repo_meta["key_features"][:3]:
-                    features_html += f'<li class="text-sm text-gray-600"><i class="fas fa-check text-green-500 mr-1"></i>{feature}</li>'
+                    features_html += f'<li class="text-sm text-gray-600"><i class="fas fa-check text-green-500 mr-1"></i>{escape(feature)}</li>'
                 features_html += "</ul>"
 
             # Build download buttons
@@ -257,7 +283,7 @@ class SiteGenerator:
                 download_html = '<div class="mt-3">'
                 if repo.get("latest_version"):
                     version = repo["latest_version"]
-                    download_html += f'<div class="text-xs text-gray-500 mb-1">Version {version["tag"]}</div>'
+                    download_html += f'<div class="text-xs text-gray-500 mb-1">Version {escape(str(version["tag"]))}</div>'
                 download_html += '<div class="flex gap-2">'
                 for platform, link in repo["download_links"].items():
                     platform_icon = {
@@ -265,7 +291,7 @@ class SiteGenerator:
                         "mac": "fa-apple",
                         "linux": "fa-linux",
                     }.get(platform, "fa-download")
-                    download_html += f'<a href="{link}" class="text-sm px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-full transition"><i class="fab {platform_icon}"></i></a>'
+                    download_html += f'<a href="{_safe_url(link)}" class="text-sm px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-full transition"><i class="fab {platform_icon}"></i></a>'
                 download_html += "</div></div>"
 
             # Build confidence indicator
@@ -274,20 +300,21 @@ class SiteGenerator:
                 confidence = repo["category_confidence"]
                 confidence_html = f'<div class="text-xs text-orange-600 mb-2">Category confidence: {confidence:.0%}</div>'
 
-            # Build main card
+            # Build main card (all repo-supplied text is escaped — repository
+            # names, descriptions, and topics are attacker-controllable)
             card = f'''
                 <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300 repo-card"
                      data-category="{category_id}"
-                     data-name="{repo["name"].lower()}"
-                     data-description="{(repo.get("description") or "").lower()}"
-                     data-topics="{" ".join(repo.get("topics", [])).lower()}">
+                     data-name="{escape(repo["name"].lower(), quote=True)}"
+                     data-description="{escape((repo.get("description") or "").lower(), quote=True)}"
+                     data-topics="{escape(" ".join(repo.get("topics", [])).lower(), quote=True)}">
 
                     {confidence_html}
 
                     <div class="flex items-start justify-between mb-3">
                         <h3 class="text-xl font-semibold text-gray-800 flex items-center">
                             <span class="text-2xl mr-2">{icon_emoji}</span>
-                            <span class="repo-name">{repo["name"]}</span>
+                            <span class="repo-name">{escape(repo["name"])}</span>
                         </h3>
                         <div class="text-right">
                             <div class="flex items-center text-sm text-gray-600">
@@ -298,16 +325,16 @@ class SiteGenerator:
                         </div>
                     </div>
 
-                    <p class="text-gray-600 mb-3 repo-description">{repo.get("description") or "No description available"}</p>
+                    <p class="text-gray-600 mb-3 repo-description">{escape(repo.get("description") or "No description available")}</p>
 
                     {features_html}
 
                     <div class="mt-4 flex flex-wrap gap-2">
-                        <a href="{repo["url"]}" class="text-sm px-3 py-1 bg-{theme_config["accent_color"]}-100 text-{theme_config["accent_color"]}-700 rounded-full hover:bg-{theme_config["accent_color"]}-200">
+                        <a href="{_safe_url(repo["url"])}" class="text-sm px-3 py-1 bg-{theme_config["accent_color"]}-100 text-{theme_config["accent_color"]}-700 rounded-full hover:bg-{theme_config["accent_color"]}-200">
                             <i class="fab fa-github mr-1"></i>GitHub
                         </a>
-                        {f'<a href="{repo["homepage"]}" class="text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"><i class="fas fa-globe mr-1"></i>Website</a>' if repo.get("homepage") else ""}
-                        {f'<a href="{repo["pages_url"]}" class="text-sm px-3 py-1 bg-green-100 text-green-700 rounded-full hover:bg-green-200"><i class="fas fa-book-open mr-1"></i>Docs</a>' if repo.get("pages_url") else ""}
+                        {f'<a href="{_safe_url(repo["homepage"])}" class="text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"><i class="fas fa-globe mr-1"></i>Website</a>' if repo.get("homepage") else ""}
+                        {f'<a href="{_safe_url(repo["pages_url"])}" class="text-sm px-3 py-1 bg-green-100 text-green-700 rounded-full hover:bg-green-200"><i class="fas fa-book-open mr-1"></i>Docs</a>' if repo.get("pages_url") else ""}
                     </div>
 
                     {download_html}
@@ -316,9 +343,9 @@ class SiteGenerator:
 
                     <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
                         <div class="flex gap-3">
-                            {" ".join([f'<span class="px-2 py-1 bg-gray-100 text-gray-600 rounded">{lang}</span>' for lang in repo.get("languages", [])[:3]])}
+                            {" ".join([f'<span class="px-2 py-1 bg-gray-100 text-gray-600 rounded">{escape(lang)}</span>' for lang in repo.get("languages", [])[:3]])}
                         </div>
-                        {f'<span class="text-green-600"><i class="fas fa-balance-scale mr-1"></i>{repo.get("license", "")}</span>' if repo.get("license") else ""}
+                        {f'<span class="text-green-600"><i class="fas fa-balance-scale mr-1"></i>{escape(repo.get("license", ""))}</span>' if repo.get("license") else ""}
                     </div>
                 </div>'''
 
@@ -337,7 +364,7 @@ class SiteGenerator:
         topic_tags: list[str] = []
         for topic in topics[:5]:  # Limit to 5 topics
             topic_tags.append(
-                f'<span class="text-xs px-2 py-1 bg-{accent_color}-50 text-{accent_color}-600 rounded-full">#{topic}</span>'
+                f'<span class="text-xs px-2 py-1 bg-{accent_color}-50 text-{accent_color}-600 rounded-full">#{escape(topic)}</span>'
             )
 
         return f'<div class="mt-2 flex flex-wrap gap-1">{" ".join(topic_tags)}</div>'
@@ -432,23 +459,24 @@ class SiteGenerator:
         }}
 
         // Enhanced highlighting
+        const escapeHtml = text => text.replace(/[&<>"']/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}}[c]));
+        const escapeRegex = text => text.replace(/[.*+?^${{}}()|[\\]\\\\]/g, '\\\\$&');
         searchInput.addEventListener('input', function(e) {{
             const searchTerms = e.target.value.toLowerCase()
                 .split(' ')
                 .filter(term => term.length > 2);
 
             document.querySelectorAll('.repo-name, .repo-description').forEach(elem => {{
-                let html = elem.textContent;
+                // Escape before innerHTML so literal HTML in repo text stays inert
+                let html = escapeHtml(elem.textContent);
 
                 if (searchTerms.length > 0) {{
                     searchTerms.forEach(term => {{
-                        const regex = new RegExp(`(${{term}})`, 'gi');
+                        const regex = new RegExp(`(${{escapeRegex(escapeHtml(term))}})`, 'gi');
                         html = html.replace(regex, '<mark class="bg-yellow-200">$1</mark>');
                     }});
-                    elem.innerHTML = html;
-                }} else {{
-                    elem.innerHTML = elem.textContent;
                 }}
+                elem.innerHTML = html;
             }});
         }});
     </script>"""

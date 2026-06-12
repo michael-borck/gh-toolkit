@@ -52,7 +52,7 @@ class LicenseManager:
             List of license info dictionaries
         """
         try:
-            response = self.client._make_request("GET", "/licenses")
+            response = self.client.request("GET", "/licenses")
             return response.json()
         except Exception as e:
             console.print(f"[yellow]Warning: Could not fetch licenses: {e}[/yellow]")
@@ -71,9 +71,7 @@ class LicenseManager:
             return self._license_cache[license_key]
 
         try:
-            response = self.client._make_request(
-                "GET", f"/licenses/{license_key.lower()}"
-            )
+            response = self.client.request("GET", f"/licenses/{license_key.lower()}")
             data = response.json()
             self._license_cache[license_key] = data
             return data
@@ -167,7 +165,9 @@ class LicenseManager:
         existing = self.check_repo_license(owner, repo)
         if existing and not force:
             result["status"] = "skipped"
-            result["reason"] = f"Already has license: {existing.get('spdx_id', 'unknown')}"
+            result["reason"] = (
+                f"Already has license: {existing.get('spdx_id', 'unknown')}"
+            )
             return result
 
         # Get license template
@@ -189,7 +189,11 @@ class LicenseManager:
             full_name = owner
 
         license_content = self.format_license_body(template_body, full_name)
-        result["content_preview"] = license_content[:200] + "..." if len(license_content) > 200 else license_content
+        result["content_preview"] = (
+            license_content[:200] + "..."
+            if len(license_content) > 200
+            else license_content
+        )
 
         if dry_run:
             result["status"] = "dry_run"
@@ -200,12 +204,14 @@ class LicenseManager:
         try:
             import base64
 
-            encoded_content = base64.b64encode(license_content.encode("utf-8")).decode("utf-8")
+            encoded_content = base64.b64encode(license_content.encode("utf-8")).decode(
+                "utf-8"
+            )
 
             # Check if LICENSE file exists
             license_sha = None
             try:
-                response = self.client._make_request(
+                response = self.client.request(
                     "GET",
                     f"/repos/{owner}/{repo}/contents/LICENSE",
                 )
@@ -224,7 +230,7 @@ class LicenseManager:
                 data["sha"] = license_sha
 
             # Create/update the file
-            response = self.client._make_request(
+            response = self.client.request(
                 "PUT",
                 f"/repos/{owner}/{repo}/contents/LICENSE",
                 json_data=data,
@@ -303,24 +309,36 @@ class LicenseManager:
                 # Print status
                 status = result["status"]
                 if status == "created":
-                    console.print(f"[green]  ✓ Added {license_key.upper()} license[/green]")
+                    console.print(
+                        f"[green]  ✓ Added {license_key.upper()} license[/green]"
+                    )
                 elif status == "updated":
-                    console.print(f"[green]  ✓ Replaced with {license_key.upper()} license[/green]")
+                    console.print(
+                        f"[green]  ✓ Replaced with {license_key.upper()} license[/green]"
+                    )
                 elif status == "dry_run":
                     action = result.get("action", "add")
-                    console.print(f"[yellow]  Would {action} {license_key.upper()} license[/yellow]")
+                    console.print(
+                        f"[yellow]  Would {action} {license_key.upper()} license[/yellow]"
+                    )
                 elif status == "skipped":
-                    console.print(f"[dim]  Skipped: {result.get('reason', 'unknown')}[/dim]")
+                    console.print(
+                        f"[dim]  Skipped: {result.get('reason', 'unknown')}[/dim]"
+                    )
                 elif status == "error":
-                    console.print(f"[red]  ✗ Error: {result.get('reason', 'unknown')}[/red]")
+                    console.print(
+                        f"[red]  ✗ Error: {result.get('reason', 'unknown')}[/red]"
+                    )
 
             except Exception as e:
                 console.print(f"[red]  ✗ Error: {e}[/red]")
-                results.append({
-                    "owner": owner,
-                    "repo": repo,
-                    "status": "error",
-                    "reason": str(e),
-                })
+                results.append(
+                    {
+                        "owner": owner,
+                        "repo": repo,
+                        "status": "error",
+                        "reason": str(e),
+                    }
+                )
 
         return results

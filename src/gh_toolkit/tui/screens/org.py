@@ -37,7 +37,9 @@ class RepoListItem(ListItem):
         star_display = f"⭐{stars}" if stars > 0 else "   "
         checkbox = "[x]" if self.selected else "[ ]"
 
-        display = f"{checkbox} {name:<18} {star_display:>4}  {language:<10} {description}"
+        display = (
+            f"{checkbox} {name:<18} {star_display:>4}  {language:<10} {description}"
+        )
         yield Label(display)
 
     def toggle_selection(self) -> None:
@@ -82,7 +84,11 @@ class OrgScreen(Screen[None]):
         """Compose the organization screen."""
         yield Vertical(
             Static(f"← {self.org_name}", classes="screen-title"),
-            Input(placeholder="Search repositories...", id="search-input", classes="search-input hidden"),
+            Input(
+                placeholder="Search repositories...",
+                id="search-input",
+                classes="search-input hidden",
+            ),
             Static("Loading...", id="stats-bar", classes="stats-bar"),
             ListView(id="repo-list", classes="repo-list"),
             classes="content",
@@ -204,7 +210,9 @@ class OrgScreen(Screen[None]):
         if self._selected_repos:
             repos = [
                 (self.org_name, repo.get("name", ""))
-                for repo in (self._filtered_repos if self._filtered_repos else self._repos)
+                for repo in (
+                    self._filtered_repos if self._filtered_repos else self._repos
+                )
                 if self._get_repo_key(repo) in self._selected_repos
             ]
             scope_desc = f"selected in {self.org_name}"
@@ -306,7 +314,8 @@ class OrgScreen(Screen[None]):
         # Filter repos by name or description
         query_lower = query.lower()
         self._filtered_repos = [
-            repo for repo in self._repos
+            repo
+            for repo in self._repos
             if query_lower in repo.get("name", "").lower()
             or query_lower in (repo.get("description") or "").lower()
         ]

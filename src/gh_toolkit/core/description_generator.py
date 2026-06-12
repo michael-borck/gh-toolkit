@@ -89,9 +89,7 @@ class DescriptionGenerator:
             )
             return None
 
-    def _generate_with_llm(
-        self, repo_data: dict[str, Any], readme: str
-    ) -> str | None:
+    def _generate_with_llm(self, repo_data: dict[str, Any], readme: str) -> str | None:
         """Generate description using Claude LLM.
 
         Args:
@@ -130,17 +128,13 @@ Only output the description, nothing else.
                 messages=[{"role": "user", "content": prompt}],
             )
 
-            response_content = response.content[0]
-            description = (
-                getattr(response_content, "text", "").strip()
-                if hasattr(response_content, "text")
-                else ""
-            )
+            response_content = response.content[0] if response.content else None
+            description = getattr(response_content, "text", "").strip()
 
             # Ensure description fits GitHub's limit and is clean
             if description:
                 # Remove surrounding quotes if present
-                description = description.strip('"\'')
+                description = description.strip("\"'")
                 return description[:250]
 
             return None
@@ -249,21 +243,27 @@ Only output the description, nothing else.
 
             # Update description if not dry run
             if dry_run:
-                result.update({
-                    "status": "dry_run",
-                    "message": f"Would update description to: {new_description}",
-                })
+                result.update(
+                    {
+                        "status": "dry_run",
+                        "message": f"Would update description to: {new_description}",
+                    }
+                )
             else:
                 if self.update_description(owner, repo, new_description):
-                    result.update({
-                        "status": "success",
-                        "message": f"Updated description to: {new_description}",
-                    })
+                    result.update(
+                        {
+                            "status": "success",
+                            "message": f"Updated description to: {new_description}",
+                        }
+                    )
                 else:
-                    result.update({
-                        "status": "error",
-                        "message": "Failed to update description via API",
-                    })
+                    result.update(
+                        {
+                            "status": "error",
+                            "message": "Failed to update description via API",
+                        }
+                    )
 
             return result
 
@@ -319,9 +319,7 @@ Only output the description, nothing else.
             elif status == "skipped":
                 console.print(f"[yellow]{message}[/yellow]")
                 if result.get("old_description"):
-                    console.print(
-                        f"[dim]Current: {result['old_description']}[/dim]"
-                    )
+                    console.print(f"[dim]Current: {result['old_description']}[/dim]")
             elif status == "dry_run":
                 console.print(f"[cyan]{message}[/cyan]")
             else:  # error

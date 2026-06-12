@@ -1,6 +1,8 @@
 """Main CLI entry point for gh-toolkit."""
 
 # Import commands
+from typing import Any
+
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -99,7 +101,9 @@ def tui() -> None:
         console.print("         or: [cyan]uv pip install gh-toolkit[tui][/cyan]")
         raise typer.Exit(1) from err
 
-    tui_app = GhToolkitApp()
+    # The tui package is excluded from strict type checking (textual is an
+    # optional extra), so its types are unknown here
+    tui_app: Any = GhToolkitApp()
     tui_app.run()
 
 

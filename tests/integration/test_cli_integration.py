@@ -5,6 +5,7 @@ import json
 import responses
 from typer.testing import CliRunner
 
+from gh_toolkit import __version__
 from gh_toolkit.cli import app
 
 
@@ -59,7 +60,7 @@ class TestCLIIntegration:
 
         assert result.exit_code == 0
         assert "gh-toolkit version" in result.stdout
-        assert "0.9.0" in result.stdout
+        assert __version__ in result.stdout
 
     def test_info_command(self):
         """Test info command."""
@@ -69,15 +70,37 @@ class TestCLIIntegration:
         assert result.exit_code == 0
         assert "gh-toolkit Information" in result.stdout
         assert "Version" in result.stdout
-        assert "0.9.0" in result.stdout
+        assert __version__ in result.stdout
 
+    @responses.activate
     def test_repo_list_missing_token(self, no_env_vars):
-        """Test repo list command without GitHub token."""
+        """Test repo list command warns but proceeds without GitHub token."""
+        # Authenticated-user lookup fails without a token
+        responses.add(
+            responses.GET,
+            "https://api.github.com/user",
+            json={"message": "Requires authentication"},
+            status=401,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/users/testuser",
+            json={"login": "testuser", "type": "User"},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/users/testuser/repos",
+            json=[],
+            status=200,
+        )
+
         runner = CliRunner()
         result = runner.invoke(app, ["repo", "list", "testuser"])
 
-        assert result.exit_code == 1
-        assert "GitHub token required" in result.stdout
+        assert result.exit_code == 0
+        assert "No GitHub token provided" in result.stdout
+        assert "No repositories found" in result.stdout
 
     def test_repo_tag_missing_token(self, no_env_vars):
         """Test repo tag command without GitHub token."""
@@ -596,7 +619,8 @@ class TestCLIIntegration:
 
         assert result.exit_code == 0
         assert "Target directory:" in result.stdout
-        assert str(target_dir) in result.stdout
+        # Rich wraps long paths across lines; join before asserting
+        assert str(target_dir) in result.stdout.replace("\n", "")
         assert "Parallel operations: 2" in result.stdout
         assert "Branch: main" in result.stdout
         assert "Clone depth: 1" in result.stdout

@@ -114,12 +114,8 @@ IMPORTANT: Consider using these preferred tags when applicable:
             )
 
             # Parse topics from response
-            response_content = response.content[0]
-            topics_text = (
-                getattr(response_content, "text", "").strip()
-                if hasattr(response_content, "text")
-                else ""
-            )
+            response_content = response.content[0] if response.content else None
+            topics_text = getattr(response_content, "text", "").strip()
             topics = [t.strip().lower() for t in topics_text.split(",") if t.strip()]
 
             # Filter and validate topics
@@ -293,12 +289,14 @@ IMPORTANT: Consider using these preferred tags when applicable:
 
             # Check for missing description and warn
             if not repo_data.get("description"):
-                console.print(f"[yellow]  No description[/yellow]")
+                console.print("[yellow]  No description[/yellow]")
                 warnings.append("missing_description")
 
                 # Generate description if requested
                 if add_description:
-                    from gh_toolkit.core.description_generator import DescriptionGenerator
+                    from gh_toolkit.core.description_generator import (
+                        DescriptionGenerator,
+                    )
 
                     desc_gen = DescriptionGenerator(
                         self.client, self.anthropic_api_key, self.rate_limit
@@ -427,7 +425,9 @@ IMPORTANT: Consider using these preferred tags when applicable:
                 f"\n[blue]Processing {i}/{len(repo_list)}: {owner}/{repo}[/blue]"
             )
 
-            result = self.process_repository(owner, repo, dry_run, force, add_description)
+            result = self.process_repository(
+                owner, repo, dry_run, force, add_description
+            )
             results.append(result)
 
             # Show result

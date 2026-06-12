@@ -196,11 +196,11 @@ class OrgReadmeGenerator:
             )
 
         context = f"""
-Organization: {org_info.get('login', '')}
-Description: {org_info.get('description') or 'No description'}
-Blog: {org_info.get('blog') or 'None'}
-Location: {org_info.get('location') or 'Unknown'}
-Public Repositories: {org_info.get('public_repos', 0)}
+Organization: {org_info.get("login", "")}
+Description: {org_info.get("description") or "No description"}
+Blog: {org_info.get("blog") or "None"}
+Location: {org_info.get("location") or "Unknown"}
+Public Repositories: {org_info.get("public_repos", 0)}
 
 Top Repositories:
 {chr(10).join(repo_summary)}
@@ -225,12 +225,8 @@ JSON only, no markdown code blocks:"""
             messages=[{"role": "user", "content": prompt}],
         )
 
-        response_content = response.content[0]
-        response_text = (
-            getattr(response_content, "text", "").strip()
-            if hasattr(response_content, "text")
-            else ""
-        )
+        response_content = response.content[0] if response.content else None
+        response_text = getattr(response_content, "text", "").strip()
 
         # Parse JSON response
         try:
@@ -268,7 +264,9 @@ JSON only, no markdown code blocks:"""
 
         focus_areas = [lang for lang, _ in top_languages]
         if top_topics:
-            focus_areas.extend([topic.replace("-", " ").title() for topic, _ in top_topics[:3]])
+            focus_areas.extend(
+                [topic.replace("-", " ").title() for topic, _ in top_topics[:3]]
+            )
 
         return {
             "title": org_name,
@@ -396,7 +394,11 @@ JSON only, no markdown code blocks:"""
         # Statistics
         if include_stats:
             lines.append("## Stats")
-            total_stars = sum(r.get("stargazers_count", 0) for repos in grouped_repos.values() for r in repos)
+            total_stars = sum(
+                r.get("stargazers_count", 0)
+                for repos in grouped_repos.values()
+                for r in repos
+            )
             total_repos = sum(len(repos) for repos in grouped_repos.values())
 
             # Collect all languages
@@ -469,7 +471,9 @@ JSON only, no markdown code blocks:"""
         avatar_url = org_info.get("avatar_url", "")
         if avatar_url:
             lines.append('<p align="center">')
-            lines.append(f'  <img src="{avatar_url}" alt="{description["title"]}" width="200" />')
+            lines.append(
+                f'  <img src="{avatar_url}" alt="{description["title"]}" width="200" />'
+            )
             lines.append("</p>")
             lines.append("")
 
@@ -489,14 +493,18 @@ JSON only, no markdown code blocks:"""
             lines.append(f"- **Location**: {org_info['location']}")
         if org_info.get("blog"):
             lines.append(f"- **Website**: [{org_info['blog']}]({org_info['blog']})")
-        lines.append(f"- **GitHub**: [@{org_info.get('login', '')}](https://github.com/{org_info.get('login', '')})")
+        lines.append(
+            f"- **GitHub**: [@{org_info.get('login', '')}](https://github.com/{org_info.get('login', '')})"
+        )
         lines.append("")
 
         # Focus areas
         if description.get("focus_areas"):
             lines.append("## Focus Areas")
             lines.append("")
-            lines.append(" | ".join([f"**{area}**" for area in description["focus_areas"]]))
+            lines.append(
+                " | ".join([f"**{area}**" for area in description["focus_areas"]])
+            )
             lines.append("")
 
         # Repositories with detailed info
@@ -518,9 +526,15 @@ JSON only, no markdown code blocks:"""
                 lines.append("")
                 lines.append(desc)
                 lines.append("")
-                lines.append(f"![Language](https://img.shields.io/badge/language-{lang.replace(' ', '%20')}-blue) ")
-                lines.append(f"![Stars](https://img.shields.io/github/stars/{repo.get('full_name', '')}?style=social) ")
-                lines.append(f"![Forks](https://img.shields.io/github/forks/{repo.get('full_name', '')}?style=social)")
+                lines.append(
+                    f"![Language](https://img.shields.io/badge/language-{lang.replace(' ', '%20')}-blue) "
+                )
+                lines.append(
+                    f"![Stars](https://img.shields.io/github/stars/{repo.get('full_name', '')}?style=social) "
+                )
+                lines.append(
+                    f"![Forks](https://img.shields.io/github/forks/{repo.get('full_name', '')}?style=social)"
+                )
                 lines.append("")
 
                 if topics:
@@ -556,7 +570,9 @@ JSON only, no markdown code blocks:"""
                 lines.append("")
                 lines.append("| Language | Repositories |")
                 lines.append("|----------|--------------|")
-                for lang, count in sorted(lang_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
+                for lang, count in sorted(
+                    lang_counts.items(), key=lambda x: x[1], reverse=True
+                )[:10]:
                     lines.append(f"| {lang} | {count} |")
                 lines.append("")
 

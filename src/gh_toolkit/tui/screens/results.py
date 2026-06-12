@@ -51,7 +51,9 @@ class ResultsScreen(ModalScreen[None]):
             # Action header
             action_name = result.action.replace("_", " ").title()
             if result.dry_run:
-                lines.append(f"[bold cyan]{action_name}[/bold cyan] [dim](dry run)[/dim]")
+                lines.append(
+                    f"[bold cyan]{action_name}[/bold cyan] [dim](dry run)[/dim]"
+                )
             else:
                 lines.append(f"[bold cyan]{action_name}[/bold cyan]")
 

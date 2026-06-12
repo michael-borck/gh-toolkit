@@ -135,8 +135,8 @@ def mock_anthropic_client(mocker):
     mock_response.content = [mocker.Mock(text="python, cli, tool, testing, automation")]
     mock_client.messages.create.return_value = mock_response
 
-    # Use mocker.patch instead of patch
-    mocker.patch("gh_toolkit.core.topic_tagger.Anthropic", return_value=mock_client)
+    # Anthropic is imported lazily inside __init__, so patch the source module
+    mocker.patch("anthropic.Anthropic", return_value=mock_client)
     yield mock_client
 
 

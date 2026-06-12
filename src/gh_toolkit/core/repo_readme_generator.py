@@ -68,7 +68,9 @@ class RepoReadmeGenerator:
         except Exception:
             return None
 
-    def assess_readme_quality(self, readme_content: str | None) -> tuple[float, list[str]]:
+    def assess_readme_quality(
+        self, readme_content: str | None
+    ) -> tuple[float, list[str]]:
         """Assess README quality and identify issues.
 
         Args:
@@ -98,13 +100,17 @@ class RepoReadmeGenerator:
             issues.append("Missing or short description")
 
         # Check for installation section
-        if re.search(r"##?\s*(install|setup|getting started)", readme_content, re.IGNORECASE):
+        if re.search(
+            r"##?\s*(install|setup|getting started)", readme_content, re.IGNORECASE
+        ):
             score += 1.0
         else:
             issues.append("Missing installation section")
 
         # Check for usage section
-        if re.search(r"##?\s*(usage|examples?|how to use)", readme_content, re.IGNORECASE):
+        if re.search(
+            r"##?\s*(usage|examples?|how to use)", readme_content, re.IGNORECASE
+        ):
             score += 1.0
         else:
             issues.append("Missing usage section")
@@ -210,7 +216,9 @@ class RepoReadmeGenerator:
                 context["key_dirs"] = []
 
         except Exception as e:
-            console.print(f"[yellow]Warning: Could not fetch full context: {e}[/yellow]")
+            console.print(
+                f"[yellow]Warning: Could not fetch full context: {e}[/yellow]"
+            )
 
         return context
 
@@ -285,22 +293,24 @@ class RepoReadmeGenerator:
         if context.get("key_dirs"):
             parts.append(f"- Key directories: {', '.join(context['key_dirs'])}")
 
-        parts.extend([
-            "",
-            "Requirements for the README:",
-            "1. Start with a clear title (# Repository Name)",
-            "2. Add a concise but informative description/introduction",
-            "3. Include an Installation section with code examples",
-            "4. Include a Usage section with practical examples",
-            "5. Add any relevant sections based on the project type (API docs, configuration, etc.)",
-            "6. Include a License section if applicable",
-            "7. Keep it professional and well-formatted",
-            "8. Use appropriate markdown formatting",
-            "9. Do NOT include badges - those will be added separately",
-            "10. Do NOT use emojis in section headers",
-            "",
-            "Generate ONLY the README content, no explanations or commentary.",
-        ])
+        parts.extend(
+            [
+                "",
+                "Requirements for the README:",
+                "1. Start with a clear title (# Repository Name)",
+                "2. Add a concise but informative description/introduction",
+                "3. Include an Installation section with code examples",
+                "4. Include a Usage section with practical examples",
+                "5. Add any relevant sections based on the project type (API docs, configuration, etc.)",
+                "6. Include a License section if applicable",
+                "7. Keep it professional and well-formatted",
+                "8. Use appropriate markdown formatting",
+                "9. Do NOT include badges - those will be added separately",
+                "10. Do NOT use emojis in section headers",
+                "",
+                "Generate ONLY the README content, no explanations or commentary.",
+            ]
+        )
 
         return "\n".join(parts)
 
@@ -321,42 +331,50 @@ class RepoReadmeGenerator:
         # Languages
         if context.get("languages"):
             primary_lang = context["languages"][0]
-            parts.extend([
-                "## Technologies",
-                "",
-                f"- Primary language: {primary_lang}",
-            ])
+            parts.extend(
+                [
+                    "## Technologies",
+                    "",
+                    f"- Primary language: {primary_lang}",
+                ]
+            )
             if len(context["languages"]) > 1:
                 parts.append(f"- Also uses: {', '.join(context['languages'][1:])}")
             parts.append("")
 
         # Installation
-        parts.extend([
-            "## Installation",
-            "",
-            "```bash",
-            f"git clone https://github.com/{context['owner']}/{context['repo']}.git",
-            f"cd {context['repo']}",
-            "```",
-            "",
-        ])
+        parts.extend(
+            [
+                "## Installation",
+                "",
+                "```bash",
+                f"git clone https://github.com/{context['owner']}/{context['repo']}.git",
+                f"cd {context['repo']}",
+                "```",
+                "",
+            ]
+        )
 
         # Usage
-        parts.extend([
-            "## Usage",
-            "",
-            "See the documentation for usage instructions.",
-            "",
-        ])
+        parts.extend(
+            [
+                "## Usage",
+                "",
+                "See the documentation for usage instructions.",
+                "",
+            ]
+        )
 
         # License
         if context.get("license_name"):
-            parts.extend([
-                "## License",
-                "",
-                f"This project is licensed under the {context['license_name']}.",
-                "",
-            ])
+            parts.extend(
+                [
+                    "## License",
+                    "",
+                    f"This project is licensed under the {context['license_name']}.",
+                    "",
+                ]
+            )
 
         return "\n".join(parts)
 
@@ -384,7 +402,7 @@ class RepoReadmeGenerator:
             current_sha = None
 
             try:
-                response = self.client._make_request(
+                response = self.client.request(
                     "GET",
                     f"/repos/{owner}/{repo}/contents/{readme_path}",
                 )
@@ -409,7 +427,7 @@ class RepoReadmeGenerator:
             if branch:
                 data["branch"] = branch
 
-            response = self.client._make_request(
+            response = self.client.request(
                 "PUT",
                 f"/repos/{owner}/{repo}/contents/{readme_path}",
                 json_data=data,
@@ -458,15 +476,11 @@ class RepoReadmeGenerator:
         result["issues"] = issues
 
         # Decide if we should update
-        should_update = False
         if current_readme is None:
-            should_update = True
             result["action"] = "create"
         elif force:
-            should_update = True
             result["action"] = "force_update"
         elif quality < min_quality:
-            should_update = True
             result["action"] = "quality_update"
         else:
             result["status"] = "skipped"
@@ -560,11 +574,13 @@ class RepoReadmeGenerator:
 
             except Exception as e:
                 console.print(f"[red]  ✗ Error: {e}[/red]")
-                results.append({
-                    "owner": owner,
-                    "repo": repo,
-                    "status": "error",
-                    "error": str(e),
-                })
+                results.append(
+                    {
+                        "owner": owner,
+                        "repo": repo,
+                        "status": "error",
+                        "error": str(e),
+                    }
+                )
 
         return results
