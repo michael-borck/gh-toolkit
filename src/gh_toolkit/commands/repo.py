@@ -454,6 +454,15 @@ def health_check(
     only_failed: bool = typer.Option(
         False, "--only-failed", help="Show only repositories that failed health checks"
     ),
+    post_issue: bool = typer.Option(
+        False,
+        "--post-issue",
+        help="Post the health report as an issue on each repo (idempotent; "
+        "updates an existing gh-toolkit issue rather than duplicating)",
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip the confirmation prompt for --post-issue"
+    ),
 ) -> None:
     """Check repository health and best practices compliance."""
 
@@ -565,6 +574,11 @@ def health_check(
                     failed_repos.append(repo_name)
 
                 progress.advance(task)
+
+        # Post feedback as issues (its own outward-facing action)
+        if post_issue:
+            _post_health_feedback(checker.client, reports, assume_yes=yes)
+            return
 
         # Filter reports if only showing failed
         display_reports = (
@@ -887,6 +901,75 @@ def _display_health_report(
 
     console.print(Panel(panel_content, title=header, border_style=border_style))
     console.print()
+
+
+def _post_health_feedback(
+    client: GitHubClient, reports: list[HealthReport], assume_yes: bool
+) -> None:
+    """Post each health report as an issue on its repo (create or update).
+
+    Idempotent: an existing issue carrying the gh-toolkit marker is updated
+    rather than duplicated. Confirms before posting unless assume_yes.
+    """
+    from gh_toolkit.core.feedback import (
+        feedback_body,
+        feedback_title,
+        find_marker_issue,
+    )
+
+    if not reports:
+        console.print("[yellow]No repositories were checked; nothing to post.[/yellow]")
+        return
+
+    # Preview
+    table = Table(title=f"Feedback to post ({len(reports)} repositories)")
+    table.add_column("Repository", style="cyan")
+    table.add_column("Grade", justify="center")
+    table.add_column("Issue title", style="white")
+    for report in reports:
+        table.add_row(
+            report.repository,
+            report.grade,
+            feedback_title(report),
+        )
+    console.print(table)
+    console.print(
+        "[dim]Existing gh-toolkit health issues are updated; others are created. "
+        "Repo owners are notified by GitHub per their settings.[/dim]"
+    )
+
+    if not assume_yes:
+        if not typer.confirm(f"\nPost feedback to {len(reports)} repository(ies)?"):
+            console.print("[yellow]Aborted; no issues posted.[/yellow]")
+            return
+
+    created = updated = failed = 0
+    for report in reports:
+        owner, _, repo = report.repository.partition("/")
+        title = feedback_title(report)
+        body = feedback_body(report)
+        try:
+            existing = find_marker_issue(client.get_repo_issues(owner, repo))
+            if existing:
+                client.update_issue(owner, repo, existing["number"], title, body)
+                console.print(
+                    f"  [blue]↻[/blue] {report.repository}: updated #{existing['number']}"
+                )
+                updated += 1
+            else:
+                issue = client.create_issue(owner, repo, title, body)
+                console.print(
+                    f"  [green]✓[/green] {report.repository}: created #{issue['number']}"
+                )
+                created += 1
+        except GitHubAPIError as e:
+            console.print(f"  [red]✗[/red] {report.repository}: {e.message}")
+            failed += 1
+
+    console.print(
+        f"\n[bold]Posted:[/bold] {created} created, {updated} updated, "
+        f"[red]{failed} failed[/red]"
+    )
 
 
 def _display_health_summary(

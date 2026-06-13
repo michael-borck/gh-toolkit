@@ -59,9 +59,13 @@ hygiene rubrics are about *"did the repo get set up / submitted properly,"* not
   at the due date." Forces a full clone, flags repos with no commit before the
   deadline, and produces the `owner/repo` folder layout content-assessment tools
   consume.
-- **Push feedback to students** — `repo health --post-issue` files the health
-  report (with its existing fix suggestions) as an issue on each repo, closing
-  the loop from grading back to learning.
+- **Push feedback to students** _(done — `repo health --post-issue`)_ — files
+  the health report (score, failing checks, fix suggestions) as an issue on each
+  repo; GitHub notifies the owner per their settings. Idempotent: re-runs update
+  the existing gh-toolkit issue (found via a hidden marker) instead of
+  duplicating. Dry-run preview + confirmation by default; `--yes` to skip.
+  There is no GitHub DM/email API, so an issue (which triggers GitHub's own
+  notifications) is the delivery mechanism.
 
 ## Performance & robustness at scale
 

@@ -147,6 +147,9 @@ gh-toolkit repo health "user/*" --json | jq '.[] | {repo: .repository, grade}'
 # Custom rubric: re-weight checks, set grade thresholds, mark checks required
 gh-toolkit repo health user/repo --rubric example_rubric.yaml
 
+# Post the health report back as a GitHub issue (idempotent; confirms first)
+gh-toolkit repo health "org/*" --post-issue
+
 # Roster submission report (joins health to a class roster CSV)
 gh-toolkit repo roster students.csv --org cs101 --repo-pattern "lab1-{github}"
 

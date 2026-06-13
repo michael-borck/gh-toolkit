@@ -609,6 +609,46 @@ class GitHubClient:
         except GitHubAPIError:
             return False
 
+    def get_repo_issues(
+        self, owner: str, repo: str, state: str = "open"
+    ) -> list[dict[str, Any]]:
+        """List a repository's issues (excluding pull requests).
+
+        The issues endpoint returns PRs too; they carry a ``pull_request`` key,
+        which we filter out so callers only see real issues.
+        """
+        items = self.get_paginated(
+            f"/repos/{owner}/{repo}/issues", params={"state": state}
+        )
+        return [item for item in items if "pull_request" not in item]
+
+    def create_issue(
+        self, owner: str, repo: str, title: str, body: str
+    ) -> dict[str, Any]:
+        """Create an issue on a repository.
+
+        Raises:
+            GitHubAPIError: e.g. 410 if issues are disabled, 403/404 if the
+                token lacks write access.
+        """
+        response = self._make_request(
+            "POST",
+            f"/repos/{owner}/{repo}/issues",
+            json_data={"title": title, "body": body},
+        )
+        return response.json()
+
+    def update_issue(
+        self, owner: str, repo: str, number: int, title: str, body: str
+    ) -> dict[str, Any]:
+        """Update an existing issue's title and body."""
+        response = self._make_request(
+            "PATCH",
+            f"/repos/{owner}/{repo}/issues/{number}",
+            json_data={"title": title, "body": body},
+        )
+        return response.json()
+
     def get_file_contents(
         self, owner: str, repo: str, path: str, ref: str | None = None
     ) -> dict[str, Any] | None:

@@ -630,6 +630,150 @@ class TestCLIIntegration:
         assert "Required checks failed" in result.stdout
         assert "Releases" in result.stdout
 
+    @staticmethod
+    def _mock_health_endpoints(repo="testuser/test-repo"):
+        api = "https://api.github.com"
+        responses.add(
+            responses.GET,
+            f"{api}/repos/{repo}",
+            json={
+                "name": repo.split("/")[1],
+                "full_name": repo,
+                "description": "A test repository",
+                "language": "Python",
+                "stargazers_count": 0,
+                "forks_count": 0,
+                "watchers_count": 0,
+                "size": 100,
+                "license": {"name": "MIT"},
+                "topics": ["python"],
+                "created_at": "2023-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z",
+                "pushed_at": "2024-01-01T00:00:00Z",
+                "homepage": "",
+                "has_issues": True,
+                "has_releases": False,
+                "archived": False,
+                "fork": False,
+                "private": False,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{api}/repos/{repo}/readme",
+            json={"content": "IyBSZXBv", "size": 6},
+            status=200,
+        )
+        for endpoint in ("contents", "actions/workflows"):
+            responses.add(
+                responses.GET, f"{api}/repos/{repo}/{endpoint}", json=[], status=200
+            )
+            responses.add(
+                responses.GET, f"{api}/repos/{repo}/{endpoint}", json=[], status=200
+            )
+
+    @responses.activate
+    def test_post_issue_creates_when_none_exists(self, mock_github_token):
+        """--post-issue opens a new issue when no gh-toolkit issue exists."""
+        self._mock_health_endpoints()
+        # No existing issues
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo/issues",
+            json=[],
+            status=200,
+        )
+        create = responses.add(
+            responses.POST,
+            "https://api.github.com/repos/testuser/test-repo/issues",
+            json={"number": 7},
+            status=201,
+        )
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "repo",
+                "health",
+                "testuser/test-repo",
+                "--post-issue",
+                "--yes",
+                "--token",
+                mock_github_token,
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "created #7" in result.stdout
+        assert create.call_count == 1
+
+    @responses.activate
+    def test_post_issue_updates_existing(self, mock_github_token):
+        """--post-issue updates the existing gh-toolkit issue (no duplicate)."""
+        from gh_toolkit.core.feedback import MARKER
+
+        self._mock_health_endpoints()
+        # Existing issue carrying the marker (page 1), then empty page to stop
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo/issues",
+            json=[{"number": 3, "body": f"old report\n{MARKER}\n"}],
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo/issues",
+            json=[],
+            status=200,
+        )
+        patch = responses.add(
+            responses.PATCH,
+            "https://api.github.com/repos/testuser/test-repo/issues/3",
+            json={"number": 3},
+            status=200,
+        )
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "repo",
+                "health",
+                "testuser/test-repo",
+                "--post-issue",
+                "--yes",
+                "--token",
+                mock_github_token,
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "updated #3" in result.stdout
+        assert patch.call_count == 1
+
+    @responses.activate
+    def test_post_issue_aborts_without_confirmation(self, mock_github_token):
+        """Without --yes, declining the prompt posts nothing."""
+        self._mock_health_endpoints()
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "repo",
+                "health",
+                "testuser/test-repo",
+                "--post-issue",
+                "--token",
+                mock_github_token,
+            ],
+            input="n\n",  # decline the confirmation
+        )
+
+        assert result.exit_code == 0
+        assert "Aborted" in result.stdout
+        # No issue API calls were made (only the health-check GETs)
+        assert not any(c.request.method in ("POST", "PATCH") for c in responses.calls)
+
     def test_repo_health_file_input(self, tmp_path, mock_github_token):
         """Test health check with file input."""
         # Create test repo list file
