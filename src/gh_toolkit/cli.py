@@ -22,6 +22,7 @@ from gh_toolkit.commands.repo import (
     license_repos,
     list_repos,
     readme_repos,
+    roster_report,
 )
 from gh_toolkit.commands.site import generate_site
 from gh_toolkit.commands.tag import tag_repos
@@ -116,6 +117,7 @@ repo_app.command("readme")(readme_repos)
 repo_app.command("license")(license_repos)
 repo_app.command("badges")(generate_badges)
 repo_app.command("health")(health_check)
+repo_app.command("roster")(roster_report)
 repo_app.command("clone")(clone_repos)
 
 # Invite commands

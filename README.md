@@ -143,6 +143,9 @@ gh-toolkit repo badges "user/*" --apply  # Auto-update READMEs
 # Check repository health and compliance
 gh-toolkit repo health user/repo --rules professional --min-score 80
 gh-toolkit repo health "user/*" --json | jq '.[] | {repo: .repository, grade}'
+
+# Roster submission report (joins health to a class roster CSV)
+gh-toolkit repo roster students.csv --org cs101 --repo-pattern "lab1-{github}"
 ```
 
 ### Site Generation
@@ -311,6 +314,11 @@ Perfect alternative to GitHub Classroom:
 # Students accept repository invitations
 gh-toolkit invite accept
 
+# Track submissions against a class roster (CSV with a github username column).
+# Reports who set up their repo and its hygiene score — not a mark of the work.
+gh-toolkit repo roster students.csv --org cs101 --repo-pattern "lab1-{github}"
+gh-toolkit repo roster students.csv --org cs101 --output submissions.csv
+
 # Extract all student repositories  
 gh-toolkit repo extract student_repos.txt --anthropic-key=sk-...
 
@@ -320,6 +328,14 @@ gh-toolkit site generate student_data.json \
   --title "CS 101 Student Projects" \
   --output class_portfolio.html
 ```
+
+The roster CSV needs a GitHub username column (`github`, `username`, `handle`,
+…); `name`, `student_id`, and an explicit `repo` column are optional and
+auto-detected. Each student's repo is resolved from an explicit `repo` column,
+the `--repo-pattern` (fields: `{github}`, `{username}`, `{id}`, `{name}`), or
+`org/<username>`. See `example_roster.csv`. This is the GitHub-side companion to
+content-assessment tools — it tracks *whether the repo was submitted and set up
+well*, leaving marking of the work to a human (see `docs/ROADMAP.md`).
 
 ## 🛠️ Development
 

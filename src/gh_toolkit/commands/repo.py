@@ -597,6 +597,199 @@ def health_check(
         raise typer.Exit(1) from e
 
 
+def roster_report(
+    roster_path: str = typer.Argument(
+        help="Roster CSV with a GitHub username column (and optional name/id/repo)"
+    ),
+    token: str | None = typer.Option(
+        None,
+        "--token",
+        "-t",
+        help="GitHub token (prefer GITHUB_TOKEN env var; CLI args are visible in shell history and process lists)",
+    ),
+    org: str | None = typer.Option(
+        None,
+        "--org",
+        help="Organization that owns the repos (used with --repo-pattern or a bare username)",
+    ),
+    repo_pattern: str | None = typer.Option(
+        None,
+        "--repo-pattern",
+        help="Repo name template, e.g. 'assignment1-{github}' (fields: github, username, id, name)",
+    ),
+    rules: str = typer.Option(
+        "academic", "--rules", "-r", help="Rule set: general, academic, professional"
+    ),
+    output: str | None = typer.Option(
+        None, "--output", "-o", help="Write the full report to a CSV file"
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Output report as JSON to stdout (for piping)"
+    ),
+) -> None:
+    """Submission/hygiene report for a class roster.
+
+    Joins repository health results to a roster of students. For each student it
+    resolves a repo (from an explicit roster column, a --repo-pattern, or
+    org/<username>), runs the health checks, and reports whether the repo exists
+    plus its hygiene score and which checks fail. This tracks *whether the repo
+    was set up properly* — it does not mark the work itself.
+
+    Examples:
+        gh-toolkit repo roster students.csv --org myclass --repo-pattern "lab1-{github}"
+        gh-toolkit repo roster students.csv --org myclass --output report.csv
+    """
+    import json as _json
+
+    from gh_toolkit.core.roster import (
+        parse_roster,
+        report_row,
+        resolve_repo,
+        rows_to_csv,
+    )
+
+    status = err_console if json_output else console
+
+    try:
+        github_token = resolve_token(token)
+        if not github_token:
+            console.print("[red]Error: GitHub token required for roster reports[/red]")
+            console.print("Set GITHUB_TOKEN environment variable or use --token option")
+            raise typer.Exit(1)
+
+        try:
+            students = parse_roster(roster_path)
+        except (FileNotFoundError, ValueError) as e:
+            console.print(f"[red]Error: {e}[/red]")
+            raise typer.Exit(1) from e
+
+        client = GitHubClient(github_token)
+        checker = RepositoryHealthChecker(client, rules)
+
+        status.print(
+            f"[green]Checking {len(students)} student repositories"
+            f" (rule set: {rules})[/green]\n"
+        )
+
+        rows: list[dict[str, Any]] = []
+        from rich.progress import (
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+        )
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=status,
+        ) as progress:
+            task = progress.add_task("Checking submissions...", total=len(students))
+            for student in students:
+                repo = resolve_repo(student, org, repo_pattern)
+                progress.update(
+                    task, description=f"Checking {repo or student.github_username}"
+                )
+
+                if repo is None:
+                    rows.append(
+                        report_row(
+                            student,
+                            None,
+                            "unresolved",
+                            None,
+                            error="Could not resolve a repo (pass --org or --repo-pattern)",
+                        )
+                    )
+                else:
+                    try:
+                        report = checker.check_repository_health(repo)
+                        rows.append(report_row(student, repo, "found", report))
+                    except GitHubAPIError as e:
+                        row_status = "not_found" if e.status_code == 404 else "error"
+                        rows.append(
+                            report_row(student, repo, row_status, None, error=e.message)
+                        )
+                    except Exception as e:  # noqa: BLE001 - per-student isolation
+                        rows.append(
+                            report_row(student, repo, "error", None, error=str(e))
+                        )
+                progress.advance(task)
+
+        if output:
+            rows_to_csv(rows, output)
+            status.print(f"\n[bold]Report written to: [link]{output}[/link][/bold]")
+
+        if json_output:
+            print(_json.dumps(rows, indent=2))
+            return
+
+        _display_roster_summary(rows)
+
+    except typer.Exit:
+        raise
+    except GitHubAPIError as e:
+        console.print(f"[red]GitHub API Error: {e.message}[/red]")
+        raise typer.Exit(1) from e
+    except Exception as e:
+        console.print(f"[red]Unexpected error: {str(e)}[/red]")
+        raise typer.Exit(1) from e
+
+
+def _display_roster_summary(rows: list[dict[str, Any]]) -> None:
+    """Display the per-student roster report as a table plus a summary."""
+    table = Table(title=f"Roster Submission Report ({len(rows)} students)")
+    table.add_column("Student", style="cyan")
+    table.add_column("Username", style="blue")
+    table.add_column("Repository", style="white")
+    table.add_column("Status", style="white")
+    table.add_column("Score", justify="right", style="yellow")
+    table.add_column("Grade", justify="center")
+    table.add_column("Failing checks", style="red", max_width=40)
+
+    status_style = {
+        "found": "green",
+        "not_found": "red",
+        "unresolved": "yellow",
+        "error": "red",
+    }
+    for row in rows:
+        st = row["status"]
+        status_label = {
+            "found": "✓ submitted",
+            "not_found": "✗ missing",
+            "unresolved": "? unresolved",
+            "error": "! error",
+        }.get(st, st)
+        score = f"{row['score_percent']}%" if row["score_percent"] is not None else "-"
+        table.add_row(
+            row["student_name"] or "-",
+            row["github_username"],
+            row["repository"] or "-",
+            f"[{status_style.get(st, 'white')}]{status_label}[/]",
+            score,
+            row["grade"] or "-",
+            row["failed_checks"] or ("" if st == "found" else "-"),
+        )
+
+    console.print(table)
+
+    found = [r for r in rows if r["status"] == "found"]
+    missing = sum(1 for r in rows if r["status"] == "not_found")
+    other = len(rows) - len(found) - missing
+    console.print(
+        f"\n[bold]Submitted:[/bold] {len(found)}/{len(rows)}"
+        f"   [bold]Missing:[/bold] {missing}"
+        f"   [bold]Unresolved/errors:[/bold] {other}"
+    )
+    if found:
+        avg = sum(r["score_percent"] for r in found) / len(found)
+        console.print(f"[bold]Average hygiene score (submitted):[/bold] {avg:.1f}%")
+
+
 def _display_health_report(
     report: HealthReport, show_details: bool, show_fixes: bool
 ) -> None:

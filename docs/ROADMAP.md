@@ -42,11 +42,12 @@ hygiene rubrics are about *"did the repo get set up / submitted properly,"* not
 
 ## Classroom use case (gh-toolkit's stated focus)
 
-- **Roster-aware submission reports** _(highest value)_ — join `repo health`
-  results to a roster CSV (name, ID, GitHub username) and emit a tracking sheet:
-  who set up their repo, who's missing a README/CI, who's still empty. The
-  health checker already produces the per-repo signals; this wires them to
-  student identity. Framed as submission/hygiene tracking, not marking.
+- **Roster-aware submission reports** _(done — `gh-toolkit repo roster`)_ — joins
+  `repo health` results to a roster CSV (name, ID, GitHub username) and emits a
+  tracking sheet: who set up their repo, who's missing a README/CI, who's still
+  empty. Resolves repos via an explicit roster column, a `--repo-pattern`, or
+  `org/<username>`. Output as a rich table, `--output` CSV, or `--json`. Framed
+  as submission/hygiene tracking, not marking.
 - **Custom health rubrics** — let educators define check weights and required
   checks in YAML (`repo health --rules assignment2.yaml`) instead of the three
   hardcoded sets. A hygiene-linter config, distinct from an assessment rubric.
