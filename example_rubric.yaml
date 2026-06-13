@@ -1,0 +1,26 @@
+# Custom health rubric for gh-toolkit (gh-toolkit repo health --rubric example_rubric.yaml)
+# Re-weights checks, sets grade thresholds, and marks checks as required.
+# This is a repository-hygiene rubric (is the repo set up well), not a mark.
+name: "Lab Submission Rubric"
+
+# Partial override of the built-in weights (category -> check -> points).
+# Anything you omit keeps its default/preset value; set a weight to 0 to drop it.
+weights:
+  documentation:
+    readme: 25       # README matters most for this assignment
+    license: 0       # not required for coursework
+  quality:
+    tests: 15
+    ci_cd: 0         # CI not expected
+
+# Optional custom grade thresholds (letter -> minimum percentage).
+grades:
+  A: 85
+  B: 70
+  C: 55
+  D: 40
+
+# Checks that must pass; failures are flagged prominently.
+required:
+  - README Existence
+  - Tests

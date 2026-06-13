@@ -48,9 +48,11 @@ hygiene rubrics are about *"did the repo get set up / submitted properly,"* not
   empty. Resolves repos via an explicit roster column, a `--repo-pattern`, or
   `org/<username>`. Output as a rich table, `--output` CSV, or `--json`. Framed
   as submission/hygiene tracking, not marking.
-- **Custom health rubrics** — let educators define check weights and required
-  checks in YAML (`repo health --rules assignment2.yaml`) instead of the three
-  hardcoded sets. A hygiene-linter config, distinct from an assessment rubric.
+- **Custom health rubrics** _(done — `--rubric`)_ — `repo health --rubric
+  my.yaml` (and `repo roster --rubric`) override check weights, grade
+  thresholds, and mark checks as required, layered on top of the named rule
+  set. Required-check failures are flagged in the report. A hygiene-linter
+  config, distinct from an assessment rubric. See `example_rubric.yaml`.
 - **Deadline snapshots for cloning** _(done — `repo clone --before`)_ —
   `repo clone --before "2026-06-12 23:59"` checks out the last commit before a
   deadline (`git rev-list -n1 --before=…`), snapshotting "what the student had

@@ -1,11 +1,51 @@
 """Repository health checker for quality audits and best practice validation."""
 
+from __future__ import annotations
+
+import copy
 import re
 from dataclasses import dataclass
 from datetime import UTC
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from gh_toolkit.core.github_client import GitHubClient
+
+if TYPE_CHECKING:
+    from gh_toolkit.core.rubric import Rubric
+
+
+# Base scoring weights: category -> check -> points. The named rule sets below
+# adjust these; a custom Rubric can override any of them (see core/rubric.py).
+DEFAULT_WEIGHTS: dict[str, dict[str, int]] = {
+    "documentation": {"readme": 10, "description": 5, "license": 5, "topics": 3},
+    "structure": {"gitignore": 3, "organization": 5, "naming": 3},
+    "quality": {"tests": 8, "ci_cd": 6, "activity": 4, "code_quality": 6},
+    "metadata": {"homepage": 2, "releases": 4, "issues_enabled": 2},
+}
+
+# All HealthCheck.name values a report can contain (used to validate rubrics).
+CHECK_NAMES: frozenset[str] = frozenset(
+    {
+        "README Existence",
+        "README Quality",
+        "Repository Description",
+        "License",
+        "Topics/Tags",
+        "Gitignore File",
+        "Organization",
+        "Naming Conventions",
+        "Tests",
+        "CI/CD",
+        "Activity",
+        "Code Quality",
+        "Homepage URL",
+        "Releases",
+        "Issues Enabled",
+    }
+)
+
+# Letter grade -> minimum percentage. A Rubric may override these.
+DEFAULT_GRADE_THRESHOLDS: dict[str, float] = {"A": 90, "B": 80, "C": 70, "D": 60}
 
 
 @dataclass
@@ -38,25 +78,31 @@ class HealthReport:
 class RepositoryHealthChecker:
     """Comprehensive repository health and quality checker."""
 
-    def __init__(self, github_client: GitHubClient, rules: str = "general"):
-        """Initialize the health checker with GitHub client and rule set."""
+    def __init__(
+        self,
+        github_client: GitHubClient,
+        rules: str = "general",
+        rubric: Rubric | None = None,
+    ):
+        """Initialize the health checker with a rule set and optional rubric.
+
+        Args:
+            github_client: GitHub API client
+            rules: Named preset (general, academic, professional)
+            rubric: Optional custom rubric. Its weight overrides are layered on
+                top of the named preset; its grade thresholds and required
+                checks replace the defaults when provided.
+        """
         self.client = github_client
         self.rules = rules
+        self.rubric = rubric
+        self.grade_thresholds: dict[str, float] = dict(DEFAULT_GRADE_THRESHOLDS)
+        self.required_checks: set[str] = set()
         self._init_rule_weights()
 
     def _init_rule_weights(self) -> None:
-        """Initialize scoring weights based on rule set."""
-        base_weights = {
-            "documentation": {
-                "readme": 10,
-                "description": 5,
-                "license": 5,
-                "topics": 3,
-            },
-            "structure": {"gitignore": 3, "organization": 5, "naming": 3},
-            "quality": {"tests": 8, "ci_cd": 6, "activity": 4, "code_quality": 6},
-            "metadata": {"homepage": 2, "releases": 4, "issues_enabled": 2},
-        }
+        """Initialize scoring weights from the preset, then any rubric overrides."""
+        base_weights = copy.deepcopy(DEFAULT_WEIGHTS)
 
         if self.rules == "academic":
             # Emphasize documentation and structure for academic projects
@@ -69,6 +115,15 @@ class RepositoryHealthChecker:
             base_weights["quality"]["tests"] = 12
             base_weights["quality"]["ci_cd"] = 10
             base_weights["quality"]["code_quality"] = 8
+
+        # Layer rubric weight overrides on top of the preset
+        if self.rubric is not None:
+            for category, checks in self.rubric.weights.items():
+                for check_key, value in checks.items():
+                    base_weights[category][check_key] = value
+            if self.rubric.grades:
+                self.grade_thresholds = dict(self.rubric.grades)
+            self.required_checks = set(self.rubric.required)
 
         self.weights = base_weights
 
@@ -101,6 +156,14 @@ class RepositoryHealthChecker:
 
         # Generate summary
         summary = self._generate_summary(checks, repo_data)
+
+        # Flag any required checks (from a rubric) that did not pass
+        if self.required_checks:
+            summary["required_failures"] = [
+                c.name
+                for c in checks
+                if c.name in self.required_checks and not c.passed
+            ]
 
         return HealthReport(
             repository=repo_full_name,
@@ -669,17 +732,17 @@ class RepositoryHealthChecker:
         return score / max_score
 
     def _calculate_grade(self, percentage: float) -> str:
-        """Calculate letter grade based on percentage."""
-        if percentage >= 90:
-            return "A"
-        elif percentage >= 80:
-            return "B"
-        elif percentage >= 70:
-            return "C"
-        elif percentage >= 60:
-            return "D"
-        else:
-            return "F"
+        """Calculate letter grade from the configured thresholds.
+
+        Returns the highest-threshold letter the percentage meets, or "F" if it
+        meets none. Thresholds come from the rubric when provided.
+        """
+        for letter, threshold in sorted(
+            self.grade_thresholds.items(), key=lambda kv: kv[1], reverse=True
+        ):
+            if percentage >= threshold:
+                return letter
+        return "F"
 
     def _generate_summary(
         self, checks: list[HealthCheck], repo_data: dict[str, Any]

@@ -541,6 +541,95 @@ class TestCLIIntegration:
         assert "grade" in data[0]
         assert isinstance(data[0]["checks"], list)
 
+    def test_repo_health_bad_rubric(self, tmp_path, mock_github_token):
+        """An invalid rubric file fails fast with a clear error."""
+        rubric = tmp_path / "bad.yaml"
+        rubric.write_text("weights:\n  documentation:\n    readmee: 5\n")
+        result = CliRunner().invoke(
+            app,
+            [
+                "repo",
+                "health",
+                "testuser/test-repo",
+                "--rubric",
+                str(rubric),
+                "--token",
+                mock_github_token,
+            ],
+        )
+        assert result.exit_code == 1
+        assert "Error loading rubric" in result.stdout
+
+    @responses.activate
+    def test_repo_health_with_rubric_required_failure(
+        self, tmp_path, mock_github_token
+    ):
+        """A rubric's required check that fails is flagged in the report."""
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo",
+            json={
+                "name": "test-repo",
+                "full_name": "testuser/test-repo",
+                "description": "A test repository",
+                "language": "Python",
+                "stargazers_count": 0,
+                "forks_count": 0,
+                "watchers_count": 0,
+                "size": 100,
+                "license": {"name": "MIT"},
+                "topics": ["python"],
+                "created_at": "2023-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z",
+                "pushed_at": "2024-01-01T00:00:00Z",
+                "homepage": "",
+                "has_issues": True,
+                "has_releases": False,  # Releases check will fail
+                "archived": False,
+                "fork": False,
+                "private": False,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo/readme",
+            json={"content": "IyBSZXBv", "size": 6},
+            status=200,
+        )
+        for endpoint in ("contents", "actions/workflows"):
+            responses.add(
+                responses.GET,
+                f"https://api.github.com/repos/testuser/test-repo/{endpoint}",
+                json=[],
+                status=200,
+            )
+            responses.add(
+                responses.GET,
+                f"https://api.github.com/repos/testuser/test-repo/{endpoint}",
+                json=[],
+                status=200,
+            )
+
+        rubric = tmp_path / "r.yaml"
+        rubric.write_text("required:\n  - Releases\n")
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "repo",
+                "health",
+                "testuser/test-repo",
+                "--rubric",
+                str(rubric),
+                "--token",
+                mock_github_token,
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Required checks failed" in result.stdout
+        assert "Releases" in result.stdout
+
     def test_repo_health_file_input(self, tmp_path, mock_github_token):
         """Test health check with file input."""
         # Create test repo list file

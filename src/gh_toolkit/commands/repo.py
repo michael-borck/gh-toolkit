@@ -19,6 +19,19 @@ console = Console()
 err_console = Console(stderr=True)
 
 
+def _load_rubric(path: str | None):
+    """Load a rubric from ``path`` or return None; exit cleanly on a bad file."""
+    if not path:
+        return None
+    from gh_toolkit.core.rubric import load_rubric
+
+    try:
+        return load_rubric(path)
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[red]Error loading rubric: {e}[/red]")
+        raise typer.Exit(1) from e
+
+
 def list_repos(
     owner: str = typer.Argument(help="GitHub username or organization name"),
     token: str | None = typer.Option(
@@ -418,6 +431,11 @@ def health_check(
     rules: str = typer.Option(
         "general", "--rules", "-r", help="Rule set: general, academic, professional"
     ),
+    rubric: str | None = typer.Option(
+        None,
+        "--rubric",
+        help="Custom rubric YAML (overrides check weights, grade thresholds, required checks)",
+    ),
     min_score: int = typer.Option(
         70, "--min-score", help="Minimum health score threshold (0-100)"
     ),
@@ -453,7 +471,7 @@ def health_check(
 
         # Initialize client and health checker
         client = GitHubClient(github_token)
-        checker = RepositoryHealthChecker(client, rules)
+        checker = RepositoryHealthChecker(client, rules, rubric=_load_rubric(rubric))
 
         # Determine if input is a file, wildcard pattern, or single repo
         repo_list: list[str] = []
@@ -620,6 +638,11 @@ def roster_report(
     rules: str = typer.Option(
         "academic", "--rules", "-r", help="Rule set: general, academic, professional"
     ),
+    rubric: str | None = typer.Option(
+        None,
+        "--rubric",
+        help="Custom rubric YAML (overrides check weights, grade thresholds, required checks)",
+    ),
     output: str | None = typer.Option(
         None, "--output", "-o", help="Write the full report to a CSV file"
     ),
@@ -664,7 +687,7 @@ def roster_report(
             raise typer.Exit(1) from e
 
         client = GitHubClient(github_token)
-        checker = RepositoryHealthChecker(client, rules)
+        checker = RepositoryHealthChecker(client, rules, rubric=_load_rubric(rubric))
 
         status.print(
             f"[green]Checking {len(students)} student repositories"
@@ -843,6 +866,15 @@ def _display_health_report(
 
     if stats_parts:
         content.append(f"[dim]{' | '.join(stats_parts)}[/dim]")
+
+    # Highlight required checks (from a rubric) that failed
+    required_failures = report.summary.get("required_failures")
+    if required_failures:
+        content.append("")
+        content.append(
+            f"[bold red]✗ Required checks failed:[/bold red] "
+            f"{', '.join(required_failures)}"
+        )
 
     panel_content = (
         "\n".join(content)
