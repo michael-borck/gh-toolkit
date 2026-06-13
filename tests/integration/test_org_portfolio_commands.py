@@ -656,3 +656,41 @@ class TestPortfolioAuditCommand:
         assert "No repositories found" in result.stdout
         assert result.exit_code == 0
         assert "Unexpected error" not in result.stdout
+
+    @responses.activate
+    def test_audit_fix_dry_run(self, no_env_vars, mock_github_token, mocker):
+        """--fix --dry-run previews and invokes the fixers without confirming."""
+        mock_org_info()
+        mock_org_repos(
+            [make_repo("alpha", description=None, topics=[], license_spdx=None)]
+        )
+        desc = mocker.patch(
+            "gh_toolkit.core.description_generator.DescriptionGenerator"
+        ).return_value
+        tag = mocker.patch("gh_toolkit.core.topic_tagger.TopicTagger").return_value
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "portfolio",
+                "audit",
+                "--org",
+                "test-org",
+                "--fix",
+                "--dry-run",
+                "--token",
+                mock_github_token,
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Fixes to apply" in result.stdout
+        # description + topics fixed in dry-run; license skipped (no --license)
+        desc.process_repository.assert_called_once_with(
+            "test-org", "alpha", dry_run=True
+        )
+        tag.process_repository.assert_called_once_with(
+            "test-org", "alpha", dry_run=True
+        )
+        assert "Skipping" in result.stdout  # missing-license note

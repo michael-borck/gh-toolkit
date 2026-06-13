@@ -80,8 +80,10 @@ hygiene rubrics are about *"did the repo get set up / submitted properly,"* not
 
 ## Smaller polish
 
-- `portfolio audit --fix` — the audit finds missing descriptions/topics and
-  `repo describe`/`repo tag` already fix them; connect them.
+- `portfolio audit --fix` _(done)_ — generates missing descriptions and topics
+  in place using the existing describe/tag fixers (and adds a license when
+  `--license KEY` is given). `--dry-run` to preview, confirmation prompt unless
+  `--yes`. License is opt-in since it's a deliberate choice, not auto-derivable.
 - `site deploy` — emit a GitHub Pages Actions workflow so the portfolio
   republishes on push.
 - `transfer list` / `transfer accept` currently exit 0 on API failure — should

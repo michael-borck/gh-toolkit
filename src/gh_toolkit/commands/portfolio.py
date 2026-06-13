@@ -6,6 +6,7 @@ from typing import Annotated, Any
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from gh_toolkit.core.config import resolve_token
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
@@ -255,6 +256,30 @@ def audit(
         "--output",
         help="Output audit report to JSON file",
     ),
+    fix: bool = typer.Option(
+        False,
+        "--fix",
+        help="Fix flagged issues: generate missing descriptions and topics "
+        "(and licenses if --license is given)",
+    ),
+    license_key: str | None = typer.Option(
+        None,
+        "--license",
+        help="License SPDX id to add for repos missing one (e.g. mit, apache-2.0). "
+        "Without it, missing-license issues are left alone.",
+    ),
+    anthropic_key: str | None = typer.Option(
+        None,
+        "--anthropic-key",
+        help="Anthropic API key for better generated descriptions/topics "
+        "(falls back to rule-based; or set ANTHROPIC_API_KEY)",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="With --fix, preview changes without writing"
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip the confirmation prompt for --fix"
+    ),
     token: str | None = typer.Option(
         None,
         "--token",
@@ -264,12 +289,15 @@ def audit(
 ) -> None:
     """Audit repositories for missing descriptions, topics, and licenses.
 
-    Scans repositories across organizations and flags those with
-    missing metadata that should be improved.
+    Scans repositories across organizations and flags those with missing
+    metadata. With --fix, generates the missing descriptions and topics in
+    place (and licenses when --license is given).
 
     Examples:
         gh-toolkit portfolio audit --discover
         gh-toolkit portfolio audit --org my-org --output audit-report.json
+        gh-toolkit portfolio audit --org my-org --fix --dry-run
+        gh-toolkit portfolio audit --org my-org --fix --license mit
     """
     try:
         # Validate inputs
@@ -349,6 +377,18 @@ def audit(
         # Print report
         generator.print_audit_report(report)
 
+        # Apply fixes if requested
+        if fix:
+            anthropic_api_key = anthropic_key or os.environ.get("ANTHROPIC_API_KEY")
+            _apply_audit_fixes(
+                client,
+                report,
+                anthropic_api_key=anthropic_api_key,
+                license_key=license_key,
+                dry_run=dry_run,
+                assume_yes=yes,
+            )
+
         # Save to file if requested
         if output:
             import json
@@ -368,3 +408,92 @@ def audit(
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e
+
+
+def _apply_audit_fixes(
+    client: GitHubClient,
+    report: dict[str, Any],
+    anthropic_api_key: str | None,
+    license_key: str | None,
+    dry_run: bool,
+    assume_yes: bool,
+) -> None:
+    """Fix audit-flagged issues in place using the existing per-issue fixers.
+
+    Descriptions and topics are derivable from repo content and always fixed;
+    a license is a deliberate choice, so it's only added when license_key is
+    given. Outward-facing writes, so it confirms first unless assume_yes.
+    """
+    from gh_toolkit.core.description_generator import DescriptionGenerator
+    from gh_toolkit.core.license_manager import LicenseManager
+    from gh_toolkit.core.topic_tagger import TopicTagger
+
+    # Group fixable issue types per repo
+    fixes: dict[str, set[str]] = {}
+    skipped_license = 0
+    for issue in report.get("issues", []):
+        repo = issue["repo"]
+        kind = issue["issue_type"]
+        if "/" not in repo:
+            continue  # need owner/repo to act
+        if kind == "missing_license" and not license_key:
+            skipped_license += 1
+            continue
+        if kind in ("missing_description", "missing_topics", "missing_license"):
+            fixes.setdefault(repo, set()).add(kind)
+
+    if skipped_license:
+        console.print(
+            f"[dim]Skipping {skipped_license} missing-license issue(s); "
+            "pass --license KEY to add one.[/dim]"
+        )
+
+    if not fixes:
+        console.print("[green]Nothing to fix.[/green]")
+        return
+
+    # Preview
+    label = {
+        "missing_description": "description",
+        "missing_topics": "topics",
+        "missing_license": "license",
+    }
+    table = Table(title=f"Fixes to apply ({len(fixes)} repositories)")
+    table.add_column("Repository", style="cyan")
+    table.add_column("Will fix", style="white")
+    for repo in sorted(fixes):
+        table.add_row(repo, ", ".join(sorted(label[k] for k in fixes[repo])))
+    console.print(table)
+
+    if dry_run:
+        console.print("[yellow]Dry run — no changes will be made.[/yellow]")
+    elif not assume_yes:
+        if not typer.confirm(f"\nApply fixes to {len(fixes)} repository(ies)?"):
+            console.print("[yellow]Aborted; no changes made.[/yellow]")
+            return
+
+    desc_gen = DescriptionGenerator(client, anthropic_api_key)
+    tagger = TopicTagger(client, anthropic_api_key)
+    license_mgr = LicenseManager(client)
+
+    fixed = failed = 0
+    for repo in sorted(fixes):
+        owner, _, name = repo.partition("/")
+        kinds = fixes[repo]
+        try:
+            if "missing_description" in kinds:
+                desc_gen.process_repository(owner, name, dry_run=dry_run)
+            if "missing_topics" in kinds:
+                tagger.process_repository(owner, name, dry_run=dry_run)
+            if "missing_license" in kinds and license_key:
+                license_mgr.add_license(owner, name, license_key, dry_run=dry_run)
+            fixed += 1
+        except GitHubAPIError as e:
+            console.print(f"  [red]✗[/red] {repo}: {e.message}")
+            failed += 1
+
+    verb = "Would fix" if dry_run else "Fixed"
+    console.print(
+        f"\n[bold]{verb}:[/bold] {fixed} repository(ies)"
+        + (f", [red]{failed} failed[/red]" if failed else "")
+    )

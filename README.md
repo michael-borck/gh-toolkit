@@ -214,6 +214,10 @@ gh-toolkit portfolio generate --org org1 --org org2 --html portfolio.html
 # Audit repositories for missing metadata
 gh-toolkit portfolio audit --discover
 gh-toolkit portfolio audit --user --output audit-report.json
+
+# Fix what the audit finds: generate missing descriptions/topics in place
+gh-toolkit portfolio audit --org my-org --fix --dry-run   # preview first
+gh-toolkit portfolio audit --org my-org --fix --license mit
 ```
 
 ### Invitation Management
