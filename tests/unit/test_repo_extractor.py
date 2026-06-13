@@ -344,27 +344,27 @@ class TestRepositoryExtractor:
             extractor.extract_repository_data("testuser", "nonexistent")
 
     def test_extract_multiple_repositories(self, mock_github_token, mocker):
-        """Test extraction of multiple repositories."""
-        mock_extract = mocker.patch.object(
-            RepositoryExtractor, "extract_repository_data"
+        """Test extraction of multiple repositories (failures excluded)."""
+
+        def fake(owner, repo_name, quiet=False):
+            if repo_name == "nonexistent":
+                raise GitHubAPIError("Not Found", 404)
+            return {"name": repo_name, "category": "X"}
+
+        mocker.patch.object(
+            RepositoryExtractor, "extract_repository_data", side_effect=fake
         )
-        mock_extract.side_effect = [
-            {"name": "repo1", "category": "Web Application"},
-            {"name": "repo2", "category": "Python Package"},
-            GitHubAPIError("Not Found", 404),  # Failed extraction
-        ]
 
         client = GitHubClient(mock_github_token)
         extractor = RepositoryExtractor(client)
 
         repo_list = ["user/repo1", "user/repo2", "user/nonexistent"]
         results = extractor.extract_multiple_repositories(
-            repo_list, show_progress=False
+            repo_list, show_progress=False, parallel=2
         )
 
-        assert len(results) == 2  # Only successful extractions
-        assert results[0]["name"] == "repo1"
-        assert results[1]["name"] == "repo2"
+        # Only successful extractions; order is not guaranteed under concurrency
+        assert {r["name"] for r in results} == {"repo1", "repo2"}
 
     def test_extract_multiple_repositories_invalid_format(
         self, mock_github_token, mocker
@@ -383,7 +383,49 @@ class TestRepositoryExtractor:
         )
 
         assert len(results) == 1
-        mock_extract.assert_called_once_with("user", "repo1")
+        mock_extract.assert_called_once_with("user", "repo1", quiet=True)
+
+    def test_extract_multiple_repositories_skip(self, mock_github_token, mocker):
+        """Repos in the skip set are not extracted (resume support)."""
+        mock_extract = mocker.patch.object(
+            RepositoryExtractor, "extract_repository_data"
+        )
+        mock_extract.return_value = {"name": "repo2", "category": "X"}
+
+        client = GitHubClient(mock_github_token)
+        extractor = RepositoryExtractor(client)
+
+        results = extractor.extract_multiple_repositories(
+            ["user/repo1", "user/repo2"],
+            show_progress=False,
+            skip={"user/repo1"},
+        )
+
+        assert len(results) == 1
+        mock_extract.assert_called_once_with("user", "repo2", quiet=True)
+
+    def test_extract_multiple_repositories_callback(self, mock_github_token, mocker):
+        """result_callback fires once per successful extraction."""
+
+        def fake(owner, repo_name, quiet=False):
+            return {"name": repo_name, "category": "X"}
+
+        mocker.patch.object(
+            RepositoryExtractor, "extract_repository_data", side_effect=fake
+        )
+
+        client = GitHubClient(mock_github_token)
+        extractor = RepositoryExtractor(client)
+
+        seen: list[str] = []
+        extractor.extract_multiple_repositories(
+            ["user/a", "user/b", "user/c"],
+            show_progress=False,
+            parallel=2,
+            result_callback=lambda r: seen.append(r["name"]),
+        )
+
+        assert sorted(seen) == ["a", "b", "c"]
 
     def test_confidence_scoring(self, mock_github_token):
         """Test confidence scoring for different scenarios."""

@@ -123,10 +123,12 @@ gh-toolkit repo list michael-borck --public --language Python
 # Machine-readable output for piping (jq, spreadsheets, gradebooks)
 gh-toolkit repo list michael-borck --json | jq '.[].name'
 
-# Extract comprehensive data
+# Extract comprehensive data (concurrent; --resume continues an interrupted run)
 gh-toolkit repo extract repos.txt \
   --anthropic-key=sk-... \
+  --parallel 8 \
   --output portfolio_data.json
+gh-toolkit repo extract repos.txt --resume --output portfolio_data.json
 
 # Generate repository descriptions with AI
 gh-toolkit repo describe "user/*" --dry-run

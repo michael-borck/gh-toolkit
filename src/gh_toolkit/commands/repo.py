@@ -295,6 +295,14 @@ def extract_repos(
     output: str = typer.Option(
         "repos_data.json", "--output", "-o", help="Output JSON file"
     ),
+    parallel: int = typer.Option(
+        4, "--parallel", "-p", help="Number of concurrent extractions"
+    ),
+    resume: bool = typer.Option(
+        False,
+        "--resume",
+        help="Skip repos already present in the output file and append the rest",
+    ),
     show_confidence: bool = typer.Option(
         False, "--show-confidence", help="Show categorization confidence details"
     ),
@@ -357,26 +365,64 @@ def extract_repos(
             f"[green]Found {len(repo_list)} repository(ies) to extract[/green]"
         )
 
-        # Extract data
-        console.print("\n[bold]Starting repository data extraction...[/bold]")
-        extracted_data = extractor.extract_multiple_repositories(repo_list)
+        # Resume: load existing results and skip repos already extracted
+        import json as _json
 
-        if not extracted_data:
+        combined: list[dict[str, Any]] = []
+        skip: set[str] = set()
+        if resume and Path(output).exists():
+            try:
+                with open(output, encoding="utf-8") as f:
+                    combined = _json.load(f)
+                skip = {r["full_name"] for r in combined if r.get("full_name")}
+                console.print(
+                    f"[blue]Resuming: {len(skip)} already in {output}, will skip those[/blue]"
+                )
+            except (OSError, ValueError, KeyError) as e:
+                console.print(
+                    f"[yellow]Could not read {output} for resume ({e}); starting fresh[/yellow]"
+                )
+                combined = []
+                skip = set()
+
+        # Persist incrementally so a crash mid-run keeps progress
+        def _save_progress(result: dict[str, Any]) -> None:
+            combined.append(result)
+            extractor.save_to_json(combined, output)
+
+        # Extract data
+        console.print(
+            f"\n[bold]Starting repository data extraction "
+            f"({parallel} concurrent)...[/bold]"
+        )
+        extracted_data = extractor.extract_multiple_repositories(
+            repo_list,
+            parallel=parallel,
+            skip=skip,
+            result_callback=_save_progress,
+        )
+
+        if not combined:
             console.print("[red]No repositories were successfully extracted[/red]")
             raise typer.Exit(1)
 
-        # Save data
-        extractor.save_to_json(extracted_data, output)
+        # Final save (covers the resume-only case where nothing new was extracted)
+        extractor.save_to_json(combined, output)
 
         # Show summary
+        attempted = len(repo_list) - len(skip)
         console.print(
-            f"\n[bold green]✓ Successfully extracted {len(extracted_data)} repositories![/bold green]"
+            f"\n[bold green]✓ Extracted {len(extracted_data)} repositories "
+            f"({len(combined)} total in {output})[/bold green]"
         )
-        console.print(
-            f"[red]✗ Failed to extract {len(repo_list) - len(extracted_data)} repositories[/red]"
-        )
+        if attempted - len(extracted_data) > 0:
+            console.print(
+                f"[red]✗ Failed to extract {attempted - len(extracted_data)} "
+                "repositories[/red]"
+            )
 
-        # Category summary
+        # Category summary over everything in the output file
+        extracted_data = combined
         categories: dict[str, int] = {}
         for repo in extracted_data:
             cat = repo["category"]

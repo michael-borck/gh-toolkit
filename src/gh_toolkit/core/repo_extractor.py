@@ -1,6 +1,8 @@
 """Repository data extraction and categorization."""
 
 import json
+from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -45,17 +47,22 @@ class RepositoryExtractor:
                 )
                 console.print("Install with: pip install anthropic")
 
-    def extract_repository_data(self, owner: str, repo_name: str) -> dict[str, Any]:
+    def extract_repository_data(
+        self, owner: str, repo_name: str, quiet: bool = False
+    ) -> dict[str, Any]:
         """Extract comprehensive data from a single repository.
 
         Args:
             owner: Repository owner
             repo_name: Repository name
+            quiet: Suppress the per-repo status line (used in batch mode where
+                the caller prints its own progress)
 
         Returns:
             Dictionary with comprehensive repository data
         """
-        console.print(f"[blue]Extracting data from {owner}/{repo_name}...[/blue]")
+        if not quiet:
+            console.print(f"[blue]Extracting data from {owner}/{repo_name}...[/blue]")
 
         # Get basic repo info
         repo_data = self.client.get_repo_info(owner, repo_name)
@@ -130,75 +137,83 @@ class RepositoryExtractor:
 
         return extracted_data
 
+    def _extract_one(self, repo_string: str) -> dict[str, Any]:
+        """Worker: extract a single 'owner/repo' string."""
+        owner, repo_name = repo_string.split("/", 1)
+        return self.extract_repository_data(owner, repo_name, quiet=True)
+
     def extract_multiple_repositories(
-        self, repo_list: list[str], show_progress: bool = True
+        self,
+        repo_list: list[str],
+        show_progress: bool = True,
+        parallel: int = 4,
+        skip: set[str] | None = None,
+        result_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> list[dict[str, Any]]:
-        """Extract data from multiple repositories.
+        """Extract data from multiple repositories concurrently.
 
         Args:
             repo_list: List of 'owner/repo' strings
-            show_progress: Whether to show progress bar
+            show_progress: Whether to show a progress bar
+            parallel: Number of concurrent workers (each repo is ~6 API calls)
+            skip: 'owner/repo' strings to skip (already extracted; for --resume)
+            result_callback: Called in the main thread with each result as it
+                completes — use it to persist progress incrementally
 
         Returns:
-            List of repository data dictionaries
+            List of newly extracted repository data dictionaries
         """
-        extracted_repos: list[dict[str, Any]] = []
+        skip = skip or set()
 
-        if show_progress:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                console=console,
-            ) as progress:
-                task = progress.add_task(
-                    "Extracting repositories...", total=len(repo_list)
+        # Validate and filter before scheduling work
+        pending: list[str] = []
+        for repo_string in repo_list:
+            normalized = repo_string.strip()
+            if "/" not in normalized:
+                console.print(
+                    f"[red]✗ Invalid format: {repo_string}. Use 'owner/repo'[/red]"
                 )
+                continue
+            if normalized in skip:
+                continue
+            pending.append(normalized)
 
-                for repo_string in repo_list:
-                    try:
-                        if "/" not in repo_string:
-                            console.print(
-                                f"[red]✗ Invalid format: {repo_string}. Use 'owner/repo'[/red]"
-                            )
-                            continue
+        extracted_repos: list[dict[str, Any]] = []
+        if not pending:
+            return extracted_repos
 
-                        owner, repo_name = repo_string.split("/", 1)
-                        progress.update(
-                            task, description=f"Extracting {repo_string}..."
-                        )
+        workers = max(1, parallel)
 
-                        repo_data = self.extract_repository_data(owner, repo_name)
-                        extracted_repos.append(repo_data)
+        def _on_complete(repo_string: str, future: Future[dict[str, Any]]) -> None:
+            try:
+                repo_data = future.result()
+                extracted_repos.append(repo_data)
+                if result_callback is not None:
+                    result_callback(repo_data)
+                console.print(f"[green]✓ Extracted: {repo_string}[/green]")
+            except Exception as e:
+                console.print(f"[red]✗ Failed to extract {repo_string}: {str(e)}[/red]")
 
-                        console.print(f"[green]✓ Extracted: {repo_string}[/green]")
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_map = {executor.submit(self._extract_one, rs): rs for rs in pending}
 
-                    except Exception as e:
-                        console.print(
-                            f"[red]✗ Failed to extract {repo_string}: {str(e)}[/red]"
-                        )
-
-                    progress.advance(task)
-        else:
-            for repo_string in repo_list:
-                try:
-                    if "/" not in repo_string:
-                        console.print(
-                            f"[red]✗ Invalid format: {repo_string}. Use 'owner/repo'[/red]"
-                        )
-                        continue
-
-                    owner, repo_name = repo_string.split("/", 1)
-                    repo_data = self.extract_repository_data(owner, repo_name)
-                    extracted_repos.append(repo_data)
-
-                    console.print(f"[green]✓ Extracted: {repo_string}[/green]")
-
-                except Exception as e:
-                    console.print(
-                        f"[red]✗ Failed to extract {repo_string}: {str(e)}[/red]"
+            if show_progress:
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    TaskProgressColumn(),
+                    console=console,
+                ) as progress:
+                    task = progress.add_task(
+                        "Extracting repositories...", total=len(pending)
                     )
+                    for future in as_completed(future_map):
+                        _on_complete(future_map[future], future)
+                        progress.advance(task)
+            else:
+                for future in as_completed(future_map):
+                    _on_complete(future_map[future], future)
 
         return extracted_repos
 

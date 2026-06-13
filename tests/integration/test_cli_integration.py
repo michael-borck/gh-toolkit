@@ -351,6 +351,91 @@ class TestCLIIntegration:
         assert "Tailwind" in content or "tailwindcss" in content
         assert "indigo" in content  # Portfolio theme accent color
 
+    @staticmethod
+    def _mock_extract_endpoints(repo):
+        """Register the endpoints extract_repository_data calls for one repo."""
+        api = "https://api.github.com"
+        owner, name = repo.split("/")
+        responses.add(
+            responses.GET,
+            f"{api}/repos/{repo}",
+            json={
+                "name": name,
+                "full_name": repo,
+                "description": "desc",
+                "html_url": f"https://github.com/{repo}",
+                "homepage": "",
+                "language": "Python",
+                "stargazers_count": 1,
+                "forks_count": 0,
+                "watchers_count": 1,
+                "open_issues_count": 0,
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-02-01T00:00:00Z",
+                "license": None,
+                "fork": False,
+                "archived": False,
+                "private": False,
+                "is_template": False,
+                "has_pages": False,
+            },
+            status=200,
+        )
+        responses.add(responses.GET, f"{api}/repos/{repo}/readme", status=404)
+        responses.add(
+            responses.GET, f"{api}/repos/{repo}/releases", json=[], status=200
+        )
+        responses.add(
+            responses.GET,
+            f"{api}/repos/{repo}/topics",
+            json={"names": ["python"]},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{api}/repos/{repo}/languages",
+            json={"Python": 100},
+            status=200,
+        )
+        responses.add(responses.GET, f"{api}/repos/{repo}/pages", status=404)
+
+    @responses.activate
+    def test_extract_resume_skips_done_and_merges(self, tmp_path, mock_github_token):
+        """--resume skips repos already in the output and appends new ones."""
+        out = tmp_path / "repos_data.json"
+        # Pre-seed with repo1 already extracted
+        out.write_text(
+            json.dumps([{"full_name": "user/repo1", "category": "Other Tool"}])
+        )
+
+        repo_list = tmp_path / "repos.txt"
+        repo_list.write_text("user/repo1\nuser/repo2\n")
+
+        # Only repo2 should be fetched; repo1 has no mocked endpoints, so if the
+        # command tried to fetch it, responses would raise a connection error.
+        self._mock_extract_endpoints("user/repo2")
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "repo",
+                "extract",
+                str(repo_list),
+                "--resume",
+                "--parallel",
+                "1",
+                "--output",
+                str(out),
+                "--token",
+                mock_github_token,
+            ],
+        )
+
+        assert result.exit_code == 0
+        data = json.loads(out.read_text())
+        names = {r["full_name"] for r in data}
+        assert names == {"user/repo1", "user/repo2"}  # merged, not overwritten
+
     def test_repo_health_help(self):
         """Test repo health command help."""
         runner = CliRunner()

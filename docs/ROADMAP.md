@@ -69,10 +69,10 @@ hygiene rubrics are about *"did the repo get set up / submitted properly,"* not
 
 ## Performance & robustness at scale
 
-- **Parallel + resumable extraction** — `repo extract` is serial (5–6 API calls
-  per repo) and loses everything on a mid-run failure. Use a worker pool (the
-  cloner already has the pattern) and write results incrementally so `--resume`
-  can pick up.
+- **Parallel + resumable extraction** _(done)_ — `repo extract --parallel N`
+  runs extractions through a worker pool, and results are saved incrementally
+  after each repo so a mid-run crash keeps progress; `--resume` reloads the
+  output file, skips repos already in it, and appends the rest.
 - **ETag-based response caching** — GitHub 304s don't count against the rate
   limit; a small local ETag cache makes re-runs nearly free.
 - **Anthropic Batches API for bulk LLM work** — tagging/describing hundreds of
