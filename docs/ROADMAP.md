@@ -25,20 +25,19 @@ hygiene rubrics are about *"did the repo get set up / submitted properly,"* not
 
 ## Quick wins
 
-- **`gh auth token` fallback** — when `GITHUB_TOKEN` is unset, fall back to the
-  `gh` CLI's stored token so the tool works with zero setup and the `--token`
-  flag becomes unnecessary in practice. _(in progress)_
-- **`--json` output** for `repo list` and `repo health` — machine-readable
-  output for piping to `jq`, spreadsheets, and gradebooks. _(in progress)_
-- **Replace the deprecated Tailwind 2 CDN** in `site_generator.py`
-  (`tailwindcss@2.2.19` on jsdelivr, EOL since 2022) — a latent breakage in
-  every published portfolio. _(in progress)_
-- **Config file support** — `~/.config/gh-toolkit/config.toml` (and a
-  per-project `gh-toolkit.toml`) for the options people repeat: default org,
-  theme, model, rate limit, preferred tags. Precedence: CLI flag > env var >
-  config file > built-in default. Touches token/model/theme/rate-limit
-  resolution across all commands, so worth a deliberate settings layer rather
-  than scattering reads — recommended as a focused next piece.
+- **`gh auth token` fallback** _(done)_ — when `GITHUB_TOKEN` is unset, falls
+  back to the `gh` CLI's stored token so the tool works with zero setup.
+- **`--json` output** _(done)_ for `repo list` and `repo health` —
+  machine-readable output for piping to `jq`, spreadsheets, and gradebooks.
+- **Replace the deprecated Tailwind 2 CDN** _(done)_ in `site_generator.py` —
+  now uses the maintained Play CDN.
+- **Config file support** _(partially done)_ — `gh-toolkit.toml` (project-local)
+  and `~/.config/gh-toolkit/config.toml` are read today, but only the `token`
+  key is wired in. Still to do: per-option defaults (default org, theme, model,
+  rate limit, preferred tags) with precedence CLI flag > env var > config file >
+  built-in default. The remaining work touches model/theme/rate-limit resolution
+  across all commands and is fiddly because typer evaluates option defaults at
+  import time — worth a deliberate settings layer rather than scattering reads.
 
 ## Classroom use case (gh-toolkit's stated focus)
 
@@ -89,6 +88,9 @@ hygiene rubrics are about *"did the repo get set up / submitted properly,"* not
 - `transfer list` / `transfer accept` currently exit 0 on API failure — should
   surface a non-zero exit code.
 - Document `gh-toolkit --install-completion` (exists via typer, undocumented).
+- **TUI test coverage** — the `tui/` package (~2,500 lines) has no tests and is
+  excluded from strict type checking. Would need textual's pilot test harness
+  and `textual` added to the dev dependency group.
 - **Footgun:** `portfolio generate` and `org readme` default their output to
   `README.md` in the *current directory* — running either in a project root
   silently overwrites the project's own README. Consider a safer default
