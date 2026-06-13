@@ -215,6 +215,8 @@ def generate(
     except GitHubAPIError as e:
         console.print(f"[red]GitHub API error: {e.message}[/red]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e
@@ -360,6 +362,8 @@ def audit(
     except GitHubAPIError as e:
         console.print(f"[red]GitHub API error: {e.message}[/red]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e

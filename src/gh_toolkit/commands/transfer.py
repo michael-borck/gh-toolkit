@@ -224,6 +224,8 @@ def initiate_transfer(
             )
             console.print("Use 'gh-toolkit transfer list' to check pending transfers.")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e
@@ -371,6 +373,8 @@ def list_transfers(
                     f"[red]Error checking repository transfers: {e.message}[/red]"
                 )
 
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e
@@ -539,6 +543,8 @@ def accept_transfers(
         except GitHubAPIError as e:
             console.print(f"[red]Error getting repository transfers: {e.message}[/red]")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e

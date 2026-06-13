@@ -154,6 +154,8 @@ def list_repos(
     except GitHubAPIError as e:
         console.print(f"[red]GitHub API Error: {e.message}[/red]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {str(e)}[/red]")
         raise typer.Exit(1) from e
@@ -378,6 +380,8 @@ def extract_repos(
     except GitHubAPIError as e:
         console.print(f"[red]GitHub API Error: {e.message}[/red]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {str(e)}[/red]")
         raise typer.Exit(1) from e
@@ -556,6 +560,8 @@ def health_check(
     except GitHubAPIError as e:
         console.print(f"[red]GitHub API Error: {e.message}[/red]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {str(e)}[/red]")
         raise typer.Exit(1) from e
@@ -840,6 +846,8 @@ def clone_repos(
     except KeyboardInterrupt as e:
         console.print("\n[yellow]Clone operation interrupted by user[/yellow]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {str(e)}[/red]")
         raise typer.Exit(1) from e
@@ -1073,6 +1081,8 @@ def describe_repos(
     except KeyboardInterrupt as e:
         console.print("\n[yellow]Operation cancelled by user[/yellow]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e
@@ -1439,6 +1449,8 @@ def generate_badges(
     except KeyboardInterrupt:
         console.print("\n[yellow]Operation cancelled[/yellow]")
         raise typer.Exit(1) from None
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1) from e
@@ -1685,6 +1697,8 @@ def readme_repos(
     except KeyboardInterrupt as e:
         console.print("\n[yellow]Operation cancelled by user[/yellow]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e
@@ -1968,6 +1982,8 @@ def license_repos(
     except KeyboardInterrupt as e:
         console.print("\n[yellow]Operation cancelled by user[/yellow]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e

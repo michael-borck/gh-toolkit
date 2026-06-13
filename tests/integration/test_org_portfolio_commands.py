@@ -121,8 +121,9 @@ class TestOrgReadmeCommand:
         assert result.exit_code == 0
         assert "DRY RUN" in result.stdout
         assert "Found 2 repositories" in result.stdout
-        # Rich markup consumes the "[name]" part of markdown links in the
-        # console preview, so assert on the URL portion instead.
+        # Preview prints with markup disabled, so markdown links keep
+        # their [name] part and repo names are visible
+        assert "alpha-tool" in result.stdout
         assert "https://github.com/test-org/alpha-tool" in result.stdout
 
     @responses.activate
@@ -541,10 +542,8 @@ class TestPortfolioGenerateCommand:
         )
 
         assert "No repositories found matching criteria" in result.stdout
-        # Known bug: the command intends `typer.Exit(0)` here, but the broad
-        # `except Exception` handler in portfolio.py catches typer.Exit and
-        # re-raises it as exit code 1 ("Unexpected error: 0").
-        assert result.exit_code == 1
+        assert result.exit_code == 0
+        assert "Unexpected error" not in result.stdout
 
 
 class TestPortfolioAuditCommand:
@@ -655,7 +654,5 @@ class TestPortfolioAuditCommand:
         )
 
         assert "No repositories found" in result.stdout
-        # Known bug: the command intends `typer.Exit(0)` here, but the broad
-        # `except Exception` handler in portfolio.py catches typer.Exit and
-        # re-raises it as exit code 1 ("Unexpected error: 0").
-        assert result.exit_code == 1
+        assert result.exit_code == 0
+        assert "Unexpected error" not in result.stdout

@@ -105,6 +105,8 @@ def generate_page(
     except FileNotFoundError as e:
         console.print(f"❌ [red]Error:[/red] README file not found at {readme_file}")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"❌ [red]Error generating page:[/red] {str(e)}")
         raise typer.Exit(1) from e

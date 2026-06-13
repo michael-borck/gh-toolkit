@@ -67,11 +67,13 @@ class LicenseManager:
         Returns:
             License template data or None if not found
         """
+        # Normalize so 'MIT' and 'mit' share one cache entry and one API call
+        license_key = license_key.lower()
         if license_key in self._license_cache:
             return self._license_cache[license_key]
 
         try:
-            response = self.client.request("GET", f"/licenses/{license_key.lower()}")
+            response = self.client.request("GET", f"/licenses/{license_key}")
             data = response.json()
             self._license_cache[license_key] = data
             return data

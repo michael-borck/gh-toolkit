@@ -195,6 +195,8 @@ def accept_invitations(
     except GitHubAPIError as e:
         console.print(f"[red]GitHub API Error: {e.message}[/red]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {str(e)}[/red]")
         raise typer.Exit(1) from e
@@ -350,6 +352,8 @@ def leave_repositories(
     except GitHubAPIError as e:
         console.print(f"[red]GitHub API Error: {e.message}[/red]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {str(e)}[/red]")
         raise typer.Exit(1) from e

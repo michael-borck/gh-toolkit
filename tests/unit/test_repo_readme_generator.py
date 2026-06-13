@@ -186,17 +186,20 @@ class TestAssessReadmeQuality:
 class TestGetReadmeContent:
     """Test README content retrieval."""
 
-    def test_decodes_base64_content(self, generator, mock_client):
-        encoded = base64.b64encode(b"# Hello World").decode("utf-8")
-        mock_client.get_repo_readme.return_value = encoded
+    def test_returns_client_content_verbatim(self, generator, mock_client):
+        # GitHubClient.get_repo_readme already base64-decodes; no re-decoding
+        # happens here even if the text itself is valid base64
+        readme = "# Hello World"
+        mock_client.get_repo_readme.return_value = readme
 
         content = generator.get_readme_content("testuser", "test-repo")
 
-        assert content == "# Hello World"
+        assert content == readme
         mock_client.get_repo_readme.assert_called_once_with("testuser", "test-repo")
 
-    def test_returns_raw_content_when_not_base64(self, generator, mock_client):
-        raw = "not-valid-base64-content!!"
+    def test_base64_looking_text_not_corrupted(self, generator, mock_client):
+        # 'abcd' is decodable base64; the old double-decode would corrupt it
+        raw = "abcd"
         mock_client.get_repo_readme.return_value = raw
 
         content = generator.get_readme_content("testuser", "test-repo")

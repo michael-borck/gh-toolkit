@@ -162,6 +162,22 @@ class TestGetLicenseTemplate:
         assert manager._license_cache["mit"] == MIT_TEMPLATE
 
     @responses.activate
+    def test_cache_is_case_insensitive(self, mock_github_token):
+        responses.add(
+            responses.GET,
+            "https://api.github.com/licenses/mit",
+            json=MIT_TEMPLATE,
+            status=200,
+        )
+
+        manager = make_manager(mock_github_token)
+        first = manager.get_license_template("MIT")
+        second = manager.get_license_template("mit")
+
+        assert first == second == MIT_TEMPLATE
+        assert len(responses.calls) == 1  # 'MIT' and 'mit' share one entry
+
+    @responses.activate
     def test_not_found_returns_none(self, mock_github_token):
         responses.add(
             responses.GET,

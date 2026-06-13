@@ -140,6 +140,8 @@ def tag_repos(
     except KeyboardInterrupt as e:
         console.print("\n[yellow]⚠ Operation cancelled by user[/yellow]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]✗ Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e

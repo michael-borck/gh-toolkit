@@ -135,7 +135,9 @@ def readme(
             console.print(
                 "\n[yellow]--- DRY RUN: Preview of generated README ---[/yellow]\n"
             )
-            console.print(readme_content)
+            # markup=False: markdown links like [name](url) would otherwise be
+            # eaten as rich markup, hiding repo names from the preview
+            console.print(readme_content, markup=False)
             console.print("\n[yellow]--- End of preview ---[/yellow]")
         elif apply:
             # Push to organization's .github repo
@@ -151,6 +153,8 @@ def readme(
     except ValueError as e:
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1) from e
+    except typer.Exit:
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e

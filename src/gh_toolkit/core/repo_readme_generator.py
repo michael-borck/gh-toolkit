@@ -1,6 +1,5 @@
 """Generate README files for individual GitHub repositories."""
 
-import base64
 import re
 import time
 from typing import Any
@@ -58,14 +57,9 @@ class RepoReadmeGenerator:
             README content as string, or None if not found.
         """
         try:
+            # GitHubClient.get_repo_readme already base64-decodes the content
             readme_data = self.client.get_repo_readme(owner, repo)
-            if readme_data:
-                # The API returns base64-encoded content
-                try:
-                    return base64.b64decode(readme_data).decode("utf-8")
-                except Exception:
-                    return readme_data
-            return None
+            return readme_data or None
         except Exception:
             return None
 
