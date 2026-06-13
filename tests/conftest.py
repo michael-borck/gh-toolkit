@@ -217,6 +217,13 @@ def mock_env_vars(monkeypatch):
 
 @pytest.fixture
 def no_env_vars(monkeypatch):
-    """Remove environment variables for testing error cases."""
+    """Simulate no credentials available from any source.
+
+    Clears the env vars and also neutralizes the config-file and `gh` CLI
+    token fallbacks so resolve_token() genuinely returns None — otherwise a
+    developer's real `gh` login would leak into "missing token" tests.
+    """
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr("gh_toolkit.core.config.load_config", lambda: {})
+    monkeypatch.setattr("gh_toolkit.core.config._gh_cli_token", lambda: None)

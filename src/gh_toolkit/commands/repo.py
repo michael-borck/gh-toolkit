@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from gh_toolkit.core.config import resolve_token
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
 from gh_toolkit.core.health_checker import HealthReport, RepositoryHealthChecker
 from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
@@ -15,6 +16,7 @@ from gh_toolkit.core.repo_cloner import CloneResult, CloneStats, RepoCloner
 from gh_toolkit.core.repo_extractor import RepositoryExtractor
 
 console = Console()
+err_console = Console(stderr=True)
 
 
 def list_repos(
@@ -45,21 +47,27 @@ def list_repos(
         False, "--verbose", "-v", help="Show detailed information"
     ),
     raw: bool = typer.Option(False, "--raw", "-r", help="Output only repository names"),
+    json_output: bool = typer.Option(
+        False, "--json", help="Output as JSON to stdout (for piping)"
+    ),
     limit: int | None = typer.Option(
         None, "--limit", "-l", help="Limit number of results"
     ),
 ) -> None:
     """List GitHub repositories with filtering options."""
 
+    # In --json mode, status/warnings go to stderr so stdout stays clean JSON
+    status = err_console if json_output else console
+
     try:
         # Use provided token or fallback to environment
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
-            console.print("[yellow]Warning: No GitHub token provided[/yellow]")
-            console.print("Rate limits will be much lower without authentication")
-            console.print("Set GITHUB_TOKEN environment variable or use --token option")
-            console.print("Get a token at: https://github.com/settings/tokens")
-            console.print()
+            status.print("[yellow]Warning: No GitHub token provided[/yellow]")
+            status.print("Rate limits will be much lower without authentication")
+            status.print("Set GITHUB_TOKEN environment variable or use --token option")
+            status.print("Get a token at: https://github.com/settings/tokens")
+            status.print()
 
         client = GitHubClient(github_token)
 
@@ -78,7 +86,7 @@ def list_repos(
             repo_type = "sources"
 
         # Get repositories
-        console.print(f"[blue]Fetching repositories for '{owner}'...[/blue]")
+        status.print(f"[blue]Fetching repositories for '{owner}'...[/blue]")
 
         # Note: GitHub API client returns list[dict[str, Any]] which we treat as GitHubRepository
         repos: list[dict[str, Any]]
@@ -99,7 +107,10 @@ def list_repos(
                 raise typer.Exit(1) from e
 
         if not repos:
-            console.print("[yellow]No repositories found[/yellow]")
+            if json_output:
+                print("[]")
+            else:
+                console.print("[yellow]No repositories found[/yellow]")
             return
 
         # Apply filters
@@ -134,13 +145,20 @@ def list_repos(
             filtered_repos = filtered_repos[:limit]
 
         if not filtered_repos:
-            console.print(
-                "[yellow]No repositories found matching the criteria[/yellow]"
-            )
+            if json_output:
+                print("[]")
+            else:
+                console.print(
+                    "[yellow]No repositories found matching the criteria[/yellow]"
+                )
             return
 
         # Display results
-        if raw:
+        if json_output:
+            import json
+
+            print(json.dumps([_repo_summary(r) for r in filtered_repos], indent=2))
+        elif raw:
             # Raw mode: just print repository names
             for repo in filtered_repos:
                 console.print(repo["name"])
@@ -272,7 +290,7 @@ def extract_repos(
 
     try:
         # Use provided token or fallback to environment
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print("[yellow]Warning: No GitHub token provided[/yellow]")
             console.print("Rate limits will be much lower without authentication")
@@ -406,6 +424,9 @@ def health_check(
     output: str | None = typer.Option(
         None, "--output", "-o", help="Output JSON report file"
     ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Output reports as JSON to stdout (for piping)"
+    ),
     show_details: bool = typer.Option(
         True, "--details/--no-details", help="Show detailed check results"
     ),
@@ -418,9 +439,12 @@ def health_check(
 ) -> None:
     """Check repository health and best practices compliance."""
 
+    # In --json mode, status/progress go to stderr so stdout stays clean JSON
+    status = err_console if json_output else console
+
     try:
         # Use provided token or fallback to environment
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print("[red]Error: GitHub token required for health checks[/red]")
             console.print("Set GITHUB_TOKEN environment variable or use --token option")
@@ -481,11 +505,11 @@ def health_check(
             console.print("[red]Error: No repositories to check[/red]")
             raise typer.Exit(1)
 
-        console.print(
+        status.print(
             f"[green]Checking health of {len(repo_list)} repository(ies)[/green]"
         )
-        console.print(f"[blue]Rule set: {rules}[/blue]")
-        console.print(f"[blue]Minimum score threshold: {min_score}%[/blue]\n")
+        status.print(f"[blue]Rule set: {rules}[/blue]")
+        status.print(f"[blue]Minimum score threshold: {min_score}%[/blue]\n")
 
         # Check each repository
         reports: list[HealthReport] = []
@@ -504,7 +528,7 @@ def health_check(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             MofNCompleteColumn(),
-            console=console,
+            console=status,
         ) as progress:
             task = progress.add_task("Checking repositories...", total=len(repo_list))
 
@@ -530,7 +554,9 @@ def health_check(
         )
 
         if not display_reports:
-            if only_failed:
+            if json_output:
+                print("[]")
+            elif only_failed:
                 console.print(
                     "[green]🎉 All repositories passed the health checks![/green]"
                 )
@@ -538,7 +564,18 @@ def health_check(
                 console.print("[yellow]No health reports to display[/yellow]")
             return
 
+        # Save JSON report to file if requested (independent of --json stdout)
+        if output:
+            _save_health_reports(reports, output)
+            status.print(
+                f"\n[bold]Health reports saved to: [link]{output}[/link][/bold]"
+            )
+
         # Display results
+        if json_output:
+            print(_health_reports_to_json(display_reports))
+            return
+
         console.print(
             f"\n[bold]Health Check Results ({len(display_reports)} repositories)[/bold]\n"
         )
@@ -549,13 +586,6 @@ def health_check(
         # Summary statistics
         if len(reports) > 1:
             _display_health_summary(reports, min_score, failed_repos)
-
-        # Save JSON report if requested
-        if output:
-            _save_health_reports(reports, output)
-            console.print(
-                f"\n[bold]Health reports saved to: [link]{output}[/link][/bold]"
-            )
 
     except GitHubAPIError as e:
         console.print(f"[red]GitHub API Error: {e.message}[/red]")
@@ -673,19 +703,36 @@ def _display_health_summary(
     )
 
 
-def _save_health_reports(reports: list[HealthReport], output_file: str) -> None:
-    """Save health reports to JSON file."""
+def _health_reports_to_json(reports: list[HealthReport]) -> str:
+    """Serialize health reports to a JSON string."""
     import json
     from dataclasses import asdict
 
-    # Convert reports to serializable format
-    serializable_reports: list[dict[str, Any]] = []
-    for report in reports:
-        report_dict = asdict(report)
-        serializable_reports.append(report_dict)
+    return json.dumps([asdict(r) for r in reports], indent=2, default=str)
 
+
+def _save_health_reports(reports: list[HealthReport], output_file: str) -> None:
+    """Save health reports to JSON file."""
     with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(serializable_reports, f, indent=2, default=str)
+        f.write(_health_reports_to_json(reports))
+
+
+def _repo_summary(repo: dict[str, Any]) -> dict[str, Any]:
+    """Curated, stable subset of repo fields for --json output."""
+    return {
+        "name": repo.get("name"),
+        "full_name": repo.get("full_name"),
+        "description": repo.get("description"),
+        "language": repo.get("language"),
+        "stars": repo.get("stargazers_count", 0),
+        "forks": repo.get("forks_count", 0),
+        "private": repo.get("private", False),
+        "archived": repo.get("archived", False),
+        "fork": repo.get("fork", False),
+        "url": repo.get("html_url"),
+        "topics": repo.get("topics", []),
+        "updated_at": repo.get("updated_at"),
+    }
 
 
 def clone_repos(
@@ -1030,7 +1077,7 @@ def describe_repos(
         from gh_toolkit.core.description_generator import DescriptionGenerator
 
         # Get tokens
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]GitHub token required. Set GITHUB_TOKEN env var or use --token[/red]"
@@ -1353,7 +1400,7 @@ def generate_badges(
     """
     try:
         # Get token
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]GitHub token required. Set GITHUB_TOKEN env var or use --token[/red]"
@@ -1631,7 +1678,7 @@ def readme_repos(
 
     try:
         # Get tokens
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]GitHub token required. Set GITHUB_TOKEN env var or use --token[/red]"
@@ -1938,7 +1985,7 @@ def license_repos(
 
     try:
         # Get token
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]GitHub token required. Set GITHUB_TOKEN env var or use --token[/red]"

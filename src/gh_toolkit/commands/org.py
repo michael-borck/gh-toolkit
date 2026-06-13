@@ -6,6 +6,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from gh_toolkit.core.config import resolve_token
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
 from gh_toolkit.core.readme_generator import OrgReadmeGenerator
 
@@ -89,7 +90,7 @@ def readme(
     """
     try:
         # Get tokens
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]Error: GitHub token required. Set GITHUB_TOKEN or use --token[/red]"

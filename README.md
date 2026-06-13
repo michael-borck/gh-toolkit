@@ -67,6 +67,26 @@ See [docs/gh-cli-comparison.md](docs/gh-cli-comparison.md) for a detailed featur
 pip install gh-toolkit
 ```
 
+### Authentication
+
+Most commands need a GitHub token. gh-toolkit resolves one from the first
+available source, so if you already use the [`gh` CLI](https://cli.github.com/)
+there's nothing to set up:
+
+1. The `--token` flag (visible in shell history/process lists — prefer the others)
+2. The `GITHUB_TOKEN` environment variable
+3. A `token` key in the config file (see below)
+4. The `gh` CLI's stored token (`gh auth token`)
+
+### Configuration file (optional)
+
+Put repeated defaults in `gh-toolkit.toml` (project-local, takes precedence) or
+`~/.config/gh-toolkit/config.toml`:
+
+```toml
+token = "ghp_..."        # optional — env var or gh CLI usually better
+```
+
 ### Basic Usage
 
 ```bash
@@ -100,6 +120,9 @@ gh-toolkit invite accept --dry-run
 # List repositories with filters
 gh-toolkit repo list michael-borck --public --language Python
 
+# Machine-readable output for piping (jq, spreadsheets, gradebooks)
+gh-toolkit repo list michael-borck --json | jq '.[].name'
+
 # Extract comprehensive data
 gh-toolkit repo extract repos.txt \
   --anthropic-key=sk-... \
@@ -107,7 +130,7 @@ gh-toolkit repo extract repos.txt \
 
 # Generate repository descriptions with AI
 gh-toolkit repo describe "user/*" --dry-run
-gh-toolkit repo describe user/repo --model claude-sonnet-4-20250514
+gh-toolkit repo describe user/repo --model claude-sonnet-4-6
 
 # Add intelligent topic tags
 gh-toolkit repo tag user/repo --force --anthropic-key=sk-...
@@ -119,6 +142,7 @@ gh-toolkit repo badges "user/*" --apply  # Auto-update READMEs
 
 # Check repository health and compliance
 gh-toolkit repo health user/repo --rules professional --min-score 80
+gh-toolkit repo health "user/*" --json | jq '.[] | {repo: .repository, grade}'
 ```
 
 ### Site Generation

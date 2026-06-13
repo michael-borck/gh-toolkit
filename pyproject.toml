@@ -1,6 +1,6 @@
 [project]
 name = "gh-toolkit"
-version = "0.20.1"
+version = "0.21.0"
 description = "GitHub repository portfolio management and presentation toolkit"
 readme = "README.md"
 authors = [

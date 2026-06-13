@@ -7,6 +7,7 @@ from typing import Annotated, Any
 import typer
 from rich.console import Console
 
+from gh_toolkit.core.config import resolve_token
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
 from gh_toolkit.core.portfolio_generator import PortfolioGenerator
 
@@ -100,7 +101,7 @@ def generate(
             raise typer.Exit(1)
 
         # Get tokens
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]Error: GitHub token required. Set GITHUB_TOKEN or use --token[/red]"
@@ -279,7 +280,7 @@ def audit(
             raise typer.Exit(1)
 
         # Get token
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]Error: GitHub token required. Set GITHUB_TOKEN or use --token[/red]"

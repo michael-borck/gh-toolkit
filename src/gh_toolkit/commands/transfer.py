@@ -1,7 +1,6 @@
 """Repository transfer management commands."""
 
 import csv
-import os
 from pathlib import Path
 from typing import Any, cast
 
@@ -11,6 +10,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from rich.table import Table
 
+from gh_toolkit.core.config import resolve_token
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
 from gh_toolkit.types import GitHubTransferResponse
 
@@ -50,7 +50,7 @@ def initiate_transfer(
 
     try:
         # Use provided token or fallback to environment
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]Error: GitHub token required for repository transfers[/red]"
@@ -246,7 +246,7 @@ def list_transfers(
 
     try:
         # Use provided token or fallback to environment
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]Error: GitHub token required for checking transfers[/red]"
@@ -401,7 +401,7 @@ def accept_transfers(
 
     try:
         # Use provided token or fallback to environment
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]Error: GitHub token required for accepting transfers[/red]"

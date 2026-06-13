@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from gh_toolkit.core.config import resolve_token
 from gh_toolkit.core.github_client import GitHubClient
 from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
 from gh_toolkit.core.topic_tagger import TopicTagger
@@ -77,7 +78,7 @@ def tag_repos(
     """
     try:
         # Get tokens
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]✗ GitHub token required. Set GITHUB_TOKEN env var or use --token[/red]"

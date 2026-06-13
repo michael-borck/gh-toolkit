@@ -226,6 +226,54 @@ class TestCLIIntegration:
         assert "repo2" in result.stdout
         assert "Found 2 repositories" in result.stdout
 
+    @responses.activate
+    def test_repo_list_json_output(self, mock_github_token):
+        """`repo list --json` emits clean, parseable JSON on stdout."""
+        responses.add(
+            responses.GET,
+            "https://api.github.com/users/testuser",
+            json={"login": "testuser", "type": "User"},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/users/testuser/repos",
+            json=[
+                {
+                    "name": "repo1",
+                    "full_name": "testuser/repo1",
+                    "description": "First repo",
+                    "stargazers_count": 10,
+                    "forks_count": 2,
+                    "language": "Python",
+                    "html_url": "https://github.com/testuser/repo1",
+                    "topics": ["cli"],
+                    "private": False,
+                    "archived": False,
+                },
+            ],
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/users/testuser/repos",
+            json=[],
+            status=200,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app, ["repo", "list", "testuser", "--json", "--token", mock_github_token]
+        )
+
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)  # stdout must be valid JSON, status on stderr
+        assert isinstance(data, list)
+        assert data[0]["name"] == "repo1"
+        assert data[0]["stars"] == 10
+        assert data[0]["url"] == "https://github.com/testuser/repo1"
+        assert data[0]["topics"] == ["cli"]
+
     def test_workflow_integration(self, tmp_path):
         """Test full workflow: extract -> site generation."""
         # Step 1: Create mock extracted data (simulating repo extract output)
@@ -408,6 +456,90 @@ class TestCLIIntegration:
         assert "testuser/test-repo" in result.stdout
         assert "Grade:" in result.stdout
         assert "Category Breakdown:" in result.stdout
+
+    @responses.activate
+    def test_repo_health_json_output(self, mock_github_token):
+        """`repo health --json` emits clean, parseable JSON on stdout."""
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo",
+            json={
+                "name": "test-repo",
+                "full_name": "testuser/test-repo",
+                "description": "A test repository",
+                "language": "Python",
+                "stargazers_count": 5,
+                "forks_count": 1,
+                "watchers_count": 3,
+                "size": 1024,
+                "license": {"name": "MIT"},
+                "topics": ["python", "test"],
+                "created_at": "2023-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z",
+                "pushed_at": "2024-01-01T00:00:00Z",
+                "homepage": "https://test-repo.example.com",
+                "has_issues": True,
+                "has_releases": False,
+                "archived": False,
+                "fork": False,
+                "private": False,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo/readme",
+            json={
+                "content": "IyBUZXN0IFJlcG8KCkEgc2ltcGxlIHRlc3QgcmVwb3NpdG9yeS4=",
+                "size": 35,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo/contents",
+            json=[{"name": "README.md", "type": "file"}],
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo/contents",
+            json=[],
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo/actions/workflows",
+            json={"workflows": [{"name": "CI", "state": "active"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testuser/test-repo/actions/workflows",
+            json=[],
+            status=200,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "repo",
+                "health",
+                "testuser/test-repo",
+                "--json",
+                "--token",
+                mock_github_token,
+            ],
+        )
+
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)  # stdout must be valid JSON
+        assert isinstance(data, list)
+        assert data[0]["repository"] == "testuser/test-repo"
+        assert "percentage" in data[0]
+        assert "grade" in data[0]
+        assert isinstance(data[0]["checks"], list)
 
     def test_repo_health_file_input(self, tmp_path, mock_github_token):
         """Test health check with file input."""

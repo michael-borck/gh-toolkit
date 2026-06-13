@@ -1,6 +1,5 @@
 """Invitation management commands."""
 
-import os
 from typing import Any
 
 import typer
@@ -8,6 +7,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
+from gh_toolkit.core.config import resolve_token
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
 
 console = Console()
@@ -28,7 +28,7 @@ def accept_invitations(
 
     try:
         # Use provided token or fallback to environment
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]Error: GitHub token required for invitation management[/red]"
@@ -220,7 +220,7 @@ def leave_repositories(
 
     try:
         # Use provided token or fallback to environment
-        github_token = token or os.environ.get("GITHUB_TOKEN")
+        github_token = resolve_token(token)
         if not github_token:
             console.print(
                 "[red]Error: GitHub token required for repository management[/red]"
