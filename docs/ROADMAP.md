@@ -51,11 +51,12 @@ hygiene rubrics are about *"did the repo get set up / submitted properly,"* not
 - **Custom health rubrics** — let educators define check weights and required
   checks in YAML (`repo health --rules assignment2.yaml`) instead of the three
   hardcoded sets. A hygiene-linter config, distinct from an assessment rubric.
-- **Deadline snapshots for cloning** — `repo clone --before "2026-06-12 23:59"`
-  checks out the last commit before a deadline
-  (`git rev-list -n1 --before=…`). Clones "what the student had at the due
-  date." Also produces the exact `submissions/<id>/` layout the lens family's
-  `assess` consumes.
+- **Deadline snapshots for cloning** _(done — `repo clone --before`)_ —
+  `repo clone --before "2026-06-12 23:59"` checks out the last commit before a
+  deadline (`git rev-list -n1 --before=…`), snapshotting "what the student had
+  at the due date." Forces a full clone, flags repos with no commit before the
+  deadline, and produces the `owner/repo` folder layout content-assessment tools
+  consume.
 - **Push feedback to students** — `repo health --post-issue` files the health
   report (with its existing fix suggestions) as an issue on each repo, closing
   the loop from grading back to learning.

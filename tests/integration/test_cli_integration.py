@@ -694,6 +694,32 @@ class TestCLIIntegration:
         assert "microsoft/vscode" in result.stdout
         assert "Would clone" in result.stdout
 
+    def test_repo_clone_before_deadline_dry_run(self, tmp_path):
+        """--before shows the deadline and drops --depth (full history needed)."""
+        target_dir = tmp_path / "repos"
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "repo",
+                "clone",
+                "microsoft/vscode",
+                "--target-dir",
+                str(target_dir),
+                "--before",
+                "2026-06-12 23:59",
+                "--depth",
+                "1",
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Deadline snapshot: last commit before 2026-06-12 23:59" in result.stdout
+        # --depth is dropped with a note when --before is used
+        assert "--depth is ignored with --before" in result.stdout
+
     def test_repo_clone_file_input_dry_run(self, tmp_path):
         """Test cloning from file input in dry-run mode."""
         # Create test repo list file

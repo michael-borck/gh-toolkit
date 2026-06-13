@@ -955,6 +955,12 @@ def clone_repos(
         "--skip-existing/--overwrite",
         help="Skip repositories that already exist locally",
     ),
+    before: str | None = typer.Option(
+        None,
+        "--before",
+        help="Check out the last commit before this date (e.g. '2026-06-12 23:59'); "
+        "snapshots submissions at a deadline. Forces a full clone.",
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be cloned without doing it"
     ),
@@ -965,6 +971,15 @@ def clone_repos(
     """Clone GitHub repositories with smart organization and parallel processing."""
 
     try:
+        # A deadline snapshot needs full history; shallow clones can't reach an
+        # older commit. Drop --depth with a warning rather than silently failing.
+        if before is not None and depth is not None:
+            console.print(
+                "[yellow]Note: --depth is ignored with --before (full history "
+                "is needed to find the deadline commit)[/yellow]"
+            )
+            depth = None
+
         # Initialize cloner
         cloner = RepoCloner(target_dir=target_dir, parallel=parallel)
 
@@ -1009,6 +1024,10 @@ def clone_repos(
             console.print(f"[blue]Branch: {branch}[/blue]")
         if depth:
             console.print(f"[blue]Clone depth: {depth}[/blue]")
+        if before:
+            console.print(
+                f"[blue]Deadline snapshot: last commit before {before}[/blue]"
+            )
 
         # Estimate disk space
         space_estimate = cloner.estimate_disk_space(repo_list)
@@ -1068,6 +1087,7 @@ def clone_repos(
                 use_ssh=ssh,
                 skip_existing=skip_existing,
                 progress_callback=progress_callback,
+                before=before,
             )
 
         # Clean up failed clones if requested
@@ -1179,9 +1199,23 @@ def _display_clone_results(
             console.print(
                 f"  [green]✓[/green] {result.repo_name} → {result.target_path}"
             )
+            if result.note:
+                console.print(f"      [dim]{result.note}[/dim]")
 
         if len(successful_repos) > 10:
             console.print(f"  ... and {len(successful_repos) - 10} more")
+
+        # Flag repos with no commit before the deadline (no submission in time)
+        no_commit = [
+            r
+            for r in successful_repos
+            if r.note and r.note.startswith("No commit before")
+        ]
+        if no_commit:
+            console.print(
+                f"\n[yellow]⚠️  {len(no_commit)} repo(s) had no commit before "
+                "the deadline (left at default HEAD)[/yellow]"
+            )
 
     # Show skipped repositories
     if stats.skipped > 0:

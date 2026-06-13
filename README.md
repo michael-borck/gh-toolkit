@@ -146,6 +146,10 @@ gh-toolkit repo health "user/*" --json | jq '.[] | {repo: .repository, grade}'
 
 # Roster submission report (joins health to a class roster CSV)
 gh-toolkit repo roster students.csv --org cs101 --repo-pattern "lab1-{github}"
+
+# Clone repos; --before snapshots each at the last commit before a deadline
+gh-toolkit repo clone student_repos.txt --target-dir ./submissions
+gh-toolkit repo clone student_repos.txt --before "2026-06-12 23:59"
 ```
 
 ### Site Generation
@@ -318,6 +322,11 @@ gh-toolkit invite accept
 # Reports who set up their repo and its hygiene score — not a mark of the work.
 gh-toolkit repo roster students.csv --org cs101 --repo-pattern "lab1-{github}"
 gh-toolkit repo roster students.csv --org cs101 --output submissions.csv
+
+# Snapshot every submission at the deadline (last commit before the due date),
+# producing an owner/repo folder tree ready for content-assessment tools.
+gh-toolkit repo clone student_repos.txt --before "2026-06-12 23:59" \
+  --target-dir ./submissions
 
 # Extract all student repositories  
 gh-toolkit repo extract student_repos.txt --anthropic-key=sk-...

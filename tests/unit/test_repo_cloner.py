@@ -462,6 +462,79 @@ class TestRepoCloner:
         assert cleaned == 0  # No successful cleanups due to error
 
 
+class TestDeadlineSnapshot:
+    """Test --before deadline-snapshot checkout."""
+
+    @pytest.fixture
+    def repo_cloner(self, tmp_path):
+        return RepoCloner(target_dir=tmp_path / "repos", parallel=1)
+
+    def test_checkout_before_finds_commit(self, repo_cloner, tmp_path):
+        def fake_run(cmd, **kwargs):
+            if "rev-list" in cmd:
+                return Mock(returncode=0, stdout="abc123def456789\n", stderr="")
+            if "checkout" in cmd:
+                return Mock(returncode=0, stdout="", stderr="")
+            return Mock(returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            note = repo_cloner._checkout_before(tmp_path, "2020-01-01 00:00")
+
+        assert "abc123de" in note
+        assert "Snapshot" in note
+
+    def test_checkout_before_no_commit(self, repo_cloner, tmp_path):
+        def fake_run(cmd, **kwargs):
+            if "rev-list" in cmd:
+                return Mock(returncode=0, stdout="\n", stderr="")
+            return Mock(returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            note = repo_cloner._checkout_before(tmp_path, "2000-01-01")
+
+        assert note.startswith("No commit before")
+
+    def test_checkout_before_rev_list_error(self, repo_cloner, tmp_path):
+        def fake_run(cmd, **kwargs):
+            if "rev-list" in cmd:
+                return Mock(returncode=128, stdout="", stderr="bad revision")
+            return Mock(returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            note = repo_cloner._checkout_before(tmp_path, "nonsense")
+
+        assert "Could not resolve" in note
+
+    def test_clone_with_before_forces_full_clone_and_checks_out(
+        self, repo_cloner, tmp_path
+    ):
+        clone_cmds = []
+
+        def fake_run(cmd, **kwargs):
+            if cmd[:2] == ["git", "clone"]:
+                clone_cmds.append(cmd)
+                return Mock(returncode=0, stdout="", stderr="")
+            if "rev-list" in cmd:
+                return Mock(returncode=0, stdout="deadbeef1234\n", stderr="")
+            if "checkout" in cmd:
+                return Mock(returncode=0, stdout="", stderr="")
+            return Mock(returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            result = repo_cloner.clone_repository(
+                "user/repo",
+                use_ssh=False,
+                depth=1,  # should be dropped because --before needs full history
+                before="2026-06-12 23:59",
+            )
+
+        assert result.success
+        assert result.note is not None
+        assert "deadbeef" in result.note
+        # --depth must NOT appear in the clone command when --before is used
+        assert "--depth" not in clone_cmds[0]
+
+
 class TestCloneResult:
     """Test CloneResult dataclass."""
 

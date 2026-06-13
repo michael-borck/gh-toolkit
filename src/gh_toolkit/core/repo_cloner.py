@@ -29,6 +29,7 @@ class CloneResult:
     error: str | None = None
     skipped: bool = False
     skip_reason: str | None = None
+    note: str | None = None  # e.g. deadline-snapshot checkout outcome
 
 
 @dataclass
@@ -191,6 +192,7 @@ class RepoCloner:
         depth: int | None = None,
         use_ssh: bool | None = None,
         skip_existing: bool = True,
+        before: str | None = None,
     ) -> CloneResult:
         """Clone a single repository.
 
@@ -200,10 +202,17 @@ class RepoCloner:
             depth: Clone depth for shallow clones
             use_ssh: Force SSH or HTTPS
             skip_existing: Skip if repository already exists locally
+            before: If set, after cloning check out the last commit before this
+                date (any git-parseable timestamp). Forces a full clone since
+                history is needed to find the commit.
 
         Returns:
             CloneResult with operation details
         """
+        # A deadline snapshot needs full history; a shallow clone may not
+        # contain the commit before the deadline.
+        if before is not None:
+            depth = None
         try:
             # Parse repository input
             owner, repo = self.parse_repo_input(repo_input)
@@ -258,11 +267,15 @@ class RepoCloner:
                 )
 
                 if result.returncode == 0:
+                    note = None
+                    if before is not None:
+                        note = self._checkout_before(target_path, before)
                     return CloneResult(
                         repo_name=f"{owner}/{repo}",
                         repo_url=clone_url,
                         target_path=target_path,
                         success=True,
+                        note=note,
                     )
                 else:
                     return CloneResult(
@@ -301,6 +314,51 @@ class RepoCloner:
                 error=f"Unexpected error: {str(e)}",
             )
 
+    def _checkout_before(self, target_path: Path, before: str) -> str:
+        """Detach-checkout the last commit before ``before`` in a cloned repo.
+
+        Best-effort: the clone itself already succeeded, so a failure here is
+        reported as a note rather than failing the whole operation.
+
+        Returns a human-readable note describing the outcome.
+        """
+        try:
+            rev = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(target_path),
+                    "rev-list",
+                    "-n",
+                    "1",
+                    f"--before={before}",
+                    "HEAD",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except subprocess.SubprocessError as e:
+            return f"Could not resolve deadline commit: {e}"
+
+        if rev.returncode != 0:
+            return f"Could not resolve deadline commit: {rev.stderr.strip()}"
+
+        sha = rev.stdout.strip()
+        if not sha:
+            return f"No commit before {before}; left at default branch HEAD"
+
+        checkout = subprocess.run(
+            ["git", "-C", str(target_path), "checkout", "--quiet", sha],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if checkout.returncode != 0:
+            return f"Failed to check out {sha[:8]}: {checkout.stderr.strip()}"
+
+        return f"Snapshot at {sha[:8]} (last commit before {before})"
+
     def clone_repositories(
         self,
         repo_inputs: list[str],
@@ -309,6 +367,7 @@ class RepoCloner:
         use_ssh: bool | None = None,
         skip_existing: bool = True,
         progress_callback: CloneProgressCallback | None = None,
+        before: str | None = None,
     ) -> tuple[list[CloneResult], CloneStats]:
         """Clone multiple repositories in parallel.
 
@@ -335,6 +394,7 @@ class RepoCloner:
                     depth,
                     use_ssh,
                     skip_existing,
+                    before,
                 ): repo_input
                 for repo_input in repo_inputs
             }
