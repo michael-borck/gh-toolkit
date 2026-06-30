@@ -23,6 +23,7 @@ class TopicTagger:
         rate_limit: float = 0.5,
         model: str | None = None,
         preferred_tags: str | None = None,
+        max_topics: int = 8,
     ):
         """Initialize with GitHub client and optional Anthropic API key.
 
@@ -32,12 +33,14 @@ class TopicTagger:
             rate_limit: Seconds to wait between API requests (default: 0.5)
             model: Anthropic model to use (default: claude-haiku-4-5)
             preferred_tags: Optional string describing preferred tags to consider
+            max_topics: Maximum number of topic tags per repository (default: 8)
         """
         self.client = github_client
         self.anthropic_api_key = anthropic_api_key
         self.rate_limit = rate_limit
         self.model = model or self.DEFAULT_MODEL
         self.preferred_tags = preferred_tags
+        self.max_topics = max_topics
 
         if anthropic_api_key:
             try:
@@ -84,7 +87,7 @@ README excerpt:
 {readme[:2000] if readme else "No README available"}
 """
 
-        prompt = f"""Based on the following GitHub repository information, suggest 5-10 relevant topic tags that would help users discover this repository. Topics should be lowercase, use hyphens instead of spaces, and be commonly used GitHub topics.
+        prompt = f"""Based on the following GitHub repository information, suggest 5-{self.max_topics} relevant topic tags that would help users discover this repository. Topics should be lowercase, use hyphens instead of spaces, and be commonly used GitHub topics.
 
 {context}
 
@@ -133,8 +136,8 @@ IMPORTANT: Consider using these preferred tags when applicable:
                     valid_topics.append(topic)
 
             return valid_topics[
-                :10
-            ]  # GitHub allows max 20 topics, but 10 is reasonable
+                : self.max_topics
+            ]  # Cap at max_topics (default 8)
 
         except Exception as e:
             console.print(f"[yellow]⚠ Error generating topics with LLM: {e}[/yellow]")
@@ -222,7 +225,7 @@ IMPORTANT: Consider using these preferred tags when applicable:
 
         # Remove duplicates and limit
         unique_topics = list(dict.fromkeys(topics))
-        return unique_topics[:8]
+        return unique_topics[: self.max_topics]
 
     def get_repo_topics(self, owner: str, repo: str) -> list[str]:
         """Get current topics for a repository."""
@@ -350,7 +353,7 @@ IMPORTANT: Consider using these preferred tags when applicable:
             if force and current_topics:
                 # Combine and deduplicate
                 all_topics = list(dict.fromkeys(current_topics + suggested_topics))
-                final_topics = all_topics[:20]  # GitHub max is 20 topics
+                final_topics = all_topics[: self.max_topics]  # Cap at max_topics (default 8)
             else:
                 final_topics = suggested_topics
 

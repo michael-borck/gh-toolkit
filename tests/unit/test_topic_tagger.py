@@ -147,6 +147,36 @@ class TestTopicTagger:
         assert topics == ["python", "cli", "tool", "testing", "automation"]
         mock_anthropic_client.messages.create.assert_called_once()
 
+    def test_max_topics_default_is_8(self, mock_github_token):
+        """Default max_topics is 8."""
+        client = GitHubClient(mock_github_token)
+        tagger = TopicTagger(client)
+        assert tagger.max_topics == 8
+
+    def test_max_topics_caps_llm_output(
+        self, mock_github_token, mock_anthropic_client, mocker
+    ):
+        """max_topics caps the number of topics returned by the LLM."""
+        many = ", ".join(f"topic{i}" for i in range(20))
+        mock_anthropic_client.messages.create.return_value = mocker.Mock(
+            content=[mocker.Mock(text=many)]
+        )
+        repo_data = {
+            "name": "big-repo",
+            "description": "A repo",
+            "language": "Python",
+            "stargazers_count": 1,
+            "forks_count": 0,
+            "languages": {"Python": 100},
+        }
+        client = GitHubClient(mock_github_token)
+        tagger = TopicTagger(client, "mock-key", max_topics=3)
+        tagger._anthropic_client = mock_anthropic_client
+
+        topics = tagger.generate_topics_with_llm(repo_data, "readme")
+        assert len(topics) == 3
+        assert topics == ["topic0", "topic1", "topic2"]
+
     def test_generate_topics_with_llm_fallback_on_error(
         self, mock_github_token, mock_anthropic_client
     ):

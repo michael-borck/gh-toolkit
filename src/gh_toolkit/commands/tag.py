@@ -62,6 +62,11 @@ def tag_repos(
         "-r",
         help="Seconds between API requests (default: 0.5)",
     ),
+    max_tags: int = typer.Option(
+        8,
+        "--max-tags",
+        help="Maximum topics per repository (default: 8; GitHub hard max is 20)",
+    ),
     output: str | None = typer.Option(
         None, "--output", "-o", help="Save results to JSON file"
     ),
@@ -97,7 +102,7 @@ def tag_repos(
 
         # Initialize clients
         client = GitHubClient(github_token)
-        tagger = TopicTagger(client, anthropic_api_key, rate_limit, model, tags)
+        tagger = TopicTagger(client, anthropic_api_key, rate_limit, model, tags, max_topics=max_tags)
 
         # Parse repository input
         repo_list = _parse_repos_input(repos_input, client)
@@ -109,6 +114,7 @@ def tag_repos(
         # Show what we're about to do
         console.print(f"\n[blue]Found {len(repo_list)} repositories to process[/blue]")
         console.print(f"[blue]Using model: {model}[/blue]")
+        console.print(f"[blue]Max topics per repo: {max_tags}[/blue]")
         if tags:
             console.print(
                 f"[blue]Preferred tags: {tags[:80]}...[/blue]"
