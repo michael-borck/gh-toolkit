@@ -38,8 +38,24 @@ Controlled tagging uses eight standard tags, split into two questions:
 
 A repository can answer both questions. A teaching web app about AI gets
 `web-app`, `education`, and `ai`. Free tags add specificity, up to the
-`--free-tags` limit. Keep the standard set at eight and put everything else in
+`--free-tags` limit. Keep the standard set small and put everything else in
 free tags.
+
+```mermaid
+flowchart LR
+  R[Repository] --> Q1{What is it?}
+  Q1 --> F1[web-app]
+  Q1 --> F2[desktop-app]
+  Q1 --> F3[cli]
+  Q1 --> F4[book]
+  R --> Q2{What is it about?}
+  Q2 --> D1[ai]
+  Q2 --> D2[education]
+  Q2 --> D3[cybersecurity]
+  Q2 --> D4[research]
+  Q2 --> D5[operations]
+  R --> T[1-2 free tags]
+```
 
 The vocabulary lives in `tags.yaml`. Each tag has a description, examples, and
 exclusions, which are passed to the classifier.
