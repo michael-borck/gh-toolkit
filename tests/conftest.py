@@ -213,6 +213,8 @@ def mock_env_vars(monkeypatch):
     """Mock environment variables for testing."""
     monkeypatch.setenv("GITHUB_TOKEN", "ghp_mock_token")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-mock-key")
+    # Keep Rich help output wide and stable on narrow CI terminals.
+    monkeypatch.setenv("COLUMNS", "200")
 
 
 @pytest.fixture
