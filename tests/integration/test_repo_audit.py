@@ -248,3 +248,67 @@ class TestRepoAudit:
 
         assert result.exit_code == 1
         assert "specify --user, --org, or both" in result.stdout
+
+    @responses.activate
+    def test_vocabulary_flags_missing_standard_tag(self, mock_github_token, tmp_path):
+        vocabulary = tmp_path / "tags.yaml"
+        vocabulary.write_text(
+            """
+name: Test tags
+tags:
+  ai:
+    description: AI tools
+  education:
+    description: Teaching
+"""
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/user/repos",
+            json=[
+                {
+                    "name": "free-tag",
+                    "full_name": "user/free-tag",
+                    "description": "A tool with only a free tag.",
+                    "topics": ["quarto"],
+                    "private": False,
+                },
+                {
+                    "name": "standard-tag",
+                    "full_name": "user/standard-tag",
+                    "description": "An AI tool.",
+                    "topics": ["ai"],
+                    "private": False,
+                },
+            ],
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/user/repos",
+            json=[],
+            status=200,
+        )
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "repo",
+                "audit",
+                "--user",
+                "--json",
+                "--vocabulary",
+                str(vocabulary),
+                "--token",
+                mock_github_token,
+            ],
+        )
+
+        assert result.exit_code == 0
+        report = json.loads(result.stdout)
+        assert report["vocabulary"] == "Test tags"
+        assert report["summary"]["without_standard_tag"] == 1
+        by_name = {repo["full_name"]: repo for repo in report["repos"]}
+        assert by_name["user/free-tag"]["standard_topics"] == []
+        assert by_name["user/free-tag"]["free_topics"] == ["quarto"]
+        assert by_name["user/standard-tag"]["standard_topics"] == ["ai"]

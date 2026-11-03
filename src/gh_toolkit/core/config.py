@@ -50,6 +50,27 @@ def get_setting(key: str, default: Any = None) -> Any:
     return load_config().get(key, default)
 
 
+def config_file() -> Path | None:
+    """Return the config file in use, or None when no file exists."""
+    for path in _config_paths():
+        if path.is_file():
+            return path
+    return None
+
+
+def token_source(cli_token: str | None = None) -> str:
+    """Describe where a GitHub token would come from, without revealing it."""
+    if cli_token:
+        return "--token"
+    if os.environ.get("GITHUB_TOKEN"):
+        return "GITHUB_TOKEN"
+    if get_setting("token"):
+        return "config file"
+    if _gh_cli_token():
+        return "gh CLI"
+    return "none"
+
+
 def _gh_cli_token() -> str | None:
     """Return the token from the `gh` CLI if it is installed and authenticated."""
     try:

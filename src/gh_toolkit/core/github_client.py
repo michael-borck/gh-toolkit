@@ -644,25 +644,29 @@ class GitHubClient:
         except GitHubAPIError:
             return False
 
-    def update_repo_description(self, owner: str, repo: str, description: str) -> bool:
+    def update_repo_description(
+        self, owner: str, repo: str, description: str | None
+    ) -> bool:
         """Update repository description via GitHub API.
 
         Uses PATCH /repos/{owner}/{repo} endpoint.
-        Description limited to 250 characters by GitHub.
+        Description limited to 250 characters by GitHub. A None value clears
+        the description, which is needed when restoring a backup.
 
         Args:
             owner: Repository owner
             repo: Repository name
-            description: New description (will be truncated to 250 chars)
+            description: New description, or None to clear it
 
         Returns:
             True if successful, False otherwise
         """
         endpoint = f"/repos/{owner}/{repo}"
+        payload = {
+            "description": description[:250] if description is not None else None
+        }
         try:
-            self._make_request(
-                "PATCH", endpoint, json_data={"description": description[:250]}
-            )
+            self._make_request("PATCH", endpoint, json_data=payload)
             return True
         except GitHubAPIError:
             return False

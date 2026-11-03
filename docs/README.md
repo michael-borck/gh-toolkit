@@ -12,6 +12,7 @@ This directory contains detailed documentation for each command and subcommand i
 - [repo badges](repo-badges.md) - Generate topic badge markdown for READMEs
 - [repo health](repo-health.md) - Check repository health and best practices compliance
 - [repo audit](repo-audit.md) - Audit descriptions, spelling, and topics, and write a backup
+- [repo restore](repo-restore.md) - Restore descriptions and topics from a backup
 - [repo clone](repo-clone.md) - Clone repositories with smart organization and parallel processing
 
 ### Invitation Management
@@ -40,6 +41,7 @@ This directory contains detailed documentation for each command and subcommand i
 | `repo badges` | Generate topic badges | Auto-apply to READMEs, multiple styles |
 | `repo health` | Check repo quality | Best practices audit, grading system |
 | `repo audit` | Audit metadata | Descriptions, spelling, topics, backup |
+| `repo restore` | Restore metadata | Descriptions, topics, dry-run |
 | `repo clone` | Clone repositories | Parallel processing, smart organization |
 | `invite accept` | Accept invitations | Dry-run mode, bulk processing |
 | `invite leave` | Leave repositories | Confirmation prompts, safety checks |
@@ -48,6 +50,10 @@ This directory contains detailed documentation for each command and subcommand i
 | `portfolio audit` | Audit repositories | Find missing metadata, personal repos, JSON reports |
 | `site generate` | Create portfolio sites | 4 themes, responsive design |
 | `page generate` | Create landing pages | HTML/Jekyll output, README conversion |
+
+## Diagnostics
+
+- [doctor](doctor.md) - Check credentials, config, and optional tools
 
 ## Comparison & Reference
 

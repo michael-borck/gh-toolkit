@@ -110,6 +110,9 @@ gh-toolkit page generate README.md --output index.html
 # Check repository health and best practices
 gh-toolkit repo health username/repo --rules academic
 
+# Check credentials, config, and optional tools
+gh-toolkit doctor
+
 # Add topic tags to repositories
 gh-toolkit repo tag username/* --dry-run
 
@@ -155,6 +158,13 @@ gh-toolkit repo health "user/*" --json | jq '.[] | {repo: .repository, grade}'
 gh-toolkit repo audit --user --include-private --json
 gh-toolkit repo audit --user --include-private \
   --output audit.json --backup gh-toolkit-backup.json
+
+# Enforce the standard tag vocabulary during an audit
+gh-toolkit repo audit --user --vocabulary tags.yaml
+
+# Restore descriptions and topics from a backup
+gh-toolkit repo restore gh-toolkit-backup.json --dry-run
+gh-toolkit repo restore gh-toolkit-backup.json --yes
 
 # Fix descriptions selected by the audit: propose, review, then apply
 gh-toolkit repo describe --from-audit audit.json \

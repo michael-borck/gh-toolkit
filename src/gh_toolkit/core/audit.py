@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from gh_toolkit.core.spelling import SpellingIssue, find_american_spellings
+from gh_toolkit.core.tag_vocabulary import TagVocabulary
 
 BACKUP_FORMAT = "gh-toolkit-backup"
 BACKUP_VERSION = 1
@@ -40,6 +41,8 @@ class RepoAudit:
     description_issues: list[str]
     spelling: list[SpellingIssue]
     topics: list[str]
+    standard_topics: list[str]
+    free_topics: list[str]
     topic_issues: list[str]
     private: bool
     archived: bool
@@ -61,6 +64,8 @@ class RepoAudit:
                 for issue in self.spelling
             ],
             "topics": self.topics,
+            "standard_topics": self.standard_topics,
+            "free_topics": self.free_topics,
             "topic_issues": self.topic_issues,
             "private": self.private,
             "archived": self.archived,
@@ -122,7 +127,9 @@ def analyze_topics(topics: list[str]) -> list[str]:
     return issues
 
 
-def audit_repository(repo: dict[str, Any]) -> RepoAudit:
+def audit_repository(
+    repo: dict[str, Any], vocabulary: TagVocabulary | None = None
+) -> RepoAudit:
     """Audit one repository payload from the GitHub API."""
     description = repo.get("description")
     status, description_issues = analyze_description(description)
@@ -133,6 +140,17 @@ def audit_repository(repo: dict[str, Any]) -> RepoAudit:
         else []
     )
 
+    if vocabulary is not None:
+        standard_topics = [topic for topic in topics if topic in vocabulary.tags]
+        free_topics = [topic for topic in topics if topic not in vocabulary.tags]
+    else:
+        standard_topics = []
+        free_topics = list(topics)
+
+    topic_issues = analyze_topics(topics)
+    if vocabulary is not None and topics and not standard_topics:
+        topic_issues.append("no standard tag")
+
     return RepoAudit(
         full_name=str(repo.get("full_name") or repo.get("name") or "unknown"),
         description=description,
@@ -140,7 +158,9 @@ def audit_repository(repo: dict[str, Any]) -> RepoAudit:
         description_issues=description_issues,
         spelling=find_american_spellings(description),
         topics=topics,
-        topic_issues=analyze_topics(topics),
+        standard_topics=standard_topics,
+        free_topics=free_topics,
+        topic_issues=topic_issues,
         private=bool(repo.get("private", False)),
         archived=bool(repo.get("archived", False)),
         fork=bool(repo.get("fork", False)),
@@ -175,7 +195,11 @@ def build_backup(
     }
 
 
-def build_report(audits: list[RepoAudit], sources: dict[str, Any]) -> dict[str, Any]:
+def build_report(
+    audits: list[RepoAudit],
+    sources: dict[str, Any],
+    vocabulary: TagVocabulary | None = None,
+) -> dict[str, Any]:
     """Build the JSON audit report."""
     summary = {
         "total": len(audits),
@@ -192,12 +216,17 @@ def build_report(audits: list[RepoAudit], sources: dict[str, Any]) -> dict[str, 
         "with_topic_issues": sum(1 for audit in audits if audit.topic_issues),
         "clean": sum(1 for audit in audits if not audit.has_issues),
     }
+    if vocabulary is not None:
+        summary["without_standard_tag"] = sum(
+            1 for audit in audits if not audit.standard_topics
+        )
 
     return {
         "format": REPORT_FORMAT,
         "version": REPORT_VERSION,
         "created_at": datetime.now(UTC).isoformat(),
         "sources": sources,
+        "vocabulary": vocabulary.name if vocabulary is not None else None,
         "summary": summary,
         "repos": [audit.to_dict() for audit in audits],
     }

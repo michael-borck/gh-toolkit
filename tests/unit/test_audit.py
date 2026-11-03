@@ -13,6 +13,7 @@ from gh_toolkit.core.audit import (
     build_report,
     write_json_atomic,
 )
+from gh_toolkit.core.tag_vocabulary import TagDefinition, TagVocabulary
 
 
 class TestDescriptionAudit:
@@ -193,3 +194,46 @@ class TestReport:
         assert report["summary"]["with_spelling"] == 1
         assert report["summary"]["with_topic_issues"] == 1
         assert report["summary"]["clean"] == 1
+
+
+class TestVocabularyAudit:
+    def test_flags_missing_standard_tag(self):
+        vocabulary = TagVocabulary(
+            name="Test",
+            tags={
+                "ai": TagDefinition("ai", "AI tools"),
+                "education": TagDefinition("education", "Teaching"),
+            },
+        )
+
+        audit = audit_repository(
+            {
+                "full_name": "owner/repo",
+                "description": "A small tool.",
+                "topics": ["quarto"],
+            },
+            vocabulary,
+        )
+
+        assert audit.standard_topics == []
+        assert audit.free_topics == ["quarto"]
+        assert "no standard tag" in audit.topic_issues
+
+    def test_separates_standard_and_free_topics(self):
+        vocabulary = TagVocabulary(
+            name="Test",
+            tags={"ai": TagDefinition("ai", "AI tools")},
+        )
+
+        audit = audit_repository(
+            {
+                "full_name": "owner/repo",
+                "description": "An AI tool.",
+                "topics": ["ai", "quarto"],
+            },
+            vocabulary,
+        )
+
+        assert audit.standard_topics == ["ai"]
+        assert audit.free_topics == ["quarto"]
+        assert "no standard tag" not in audit.topic_issues

@@ -9,6 +9,7 @@ from rich.table import Table
 
 from gh_toolkit import __version__
 from gh_toolkit.commands.audit import audit_repos
+from gh_toolkit.commands.doctor import doctor
 from gh_toolkit.commands.invite import accept_invitations, leave_repositories
 from gh_toolkit.commands.org import readme as org_readme
 from gh_toolkit.commands.page import generate_page
@@ -25,6 +26,7 @@ from gh_toolkit.commands.repo import (
     readme_repos,
     roster_report,
 )
+from gh_toolkit.commands.restore import restore_repos
 from gh_toolkit.commands.site import generate_site
 from gh_toolkit.commands.tag import tag_repos
 from gh_toolkit.commands.transfer import (
@@ -91,6 +93,9 @@ def info() -> None:
     console.print(table)
 
 
+app.command("doctor")(doctor)
+
+
 @app.command()
 def tui() -> None:
     """Launch interactive TUI for browsing organizations and repositories."""
@@ -121,6 +126,7 @@ repo_app.command("health")(health_check)
 repo_app.command("roster")(roster_report)
 repo_app.command("clone")(clone_repos)
 repo_app.command("audit")(audit_repos)
+repo_app.command("restore")(restore_repos)
 
 # Invite commands
 invite_app.command("accept")(accept_invitations)

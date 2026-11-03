@@ -18,6 +18,7 @@ from gh_toolkit.core.audit import (
 )
 from gh_toolkit.core.config import resolve_token
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
+from gh_toolkit.core.tag_vocabulary import load_vocabulary
 
 console = Console()
 err_console = Console(stderr=True)
@@ -38,6 +39,11 @@ def audit_repos(
         False,
         "--include-private",
         help="Include private repositories",
+    ),
+    vocabulary: str | None = typer.Option(
+        None,
+        "--vocabulary",
+        help="YAML tag vocabulary to check for standard tags",
     ),
     token: str | None = typer.Option(
         None,
@@ -92,6 +98,14 @@ def audit_repos(
             console.print("Set GITHUB_TOKEN environment variable or use --token option")
             raise typer.Exit(1)
 
+        vocab = None
+        if vocabulary:
+            try:
+                vocab = load_vocabulary(vocabulary)
+            except (FileNotFoundError, ValueError) as e:
+                console.print(f"[red]Error loading vocabulary: {e}[/red]")
+                raise typer.Exit(1) from e
+
         client = GitHubClient(github_token)
         repos = _fetch_repos(client, user, org or [], include_private, status)
 
@@ -100,8 +114,8 @@ def audit_repos(
             raise typer.Exit(0)
 
         sources = {"user": user, "orgs": org or []}
-        audits = [audit_repository(repo) for repo in repos]
-        report = build_report(audits, sources)
+        audits = [audit_repository(repo, vocab) for repo in repos]
+        report = build_report(audits, sources, vocab)
 
         if backup:
             write_json_atomic(build_backup(repos, sources), backup)
@@ -195,7 +209,8 @@ def _display_audit(audits: list[RepoAudit], summary: dict[str, int]) -> None:
     table.add_column("Repository", style="cyan")
     table.add_column("Description", style="white")
     table.add_column("Spelling", style="yellow", max_width=40)
-    table.add_column("Topics", style="magenta", max_width=40)
+    table.add_column("Standard tags", style="green", max_width=30)
+    table.add_column("Topic issues", style="magenta", max_width=40)
 
     for audit in audits:
         style = status_style.get(audit.description_status, "white")
@@ -206,6 +221,7 @@ def _display_audit(audits: list[RepoAudit], summary: dict[str, int]) -> None:
             audit.full_name,
             f"[{style}]{audit.description_status}[/]",
             spelling or "-",
+            ", ".join(audit.standard_topics) or "-",
             "; ".join(audit.topic_issues) or "-",
         )
 
@@ -219,3 +235,7 @@ def _display_audit(audits: list[RepoAudit], summary: dict[str, int]) -> None:
         f"[magenta]{summary['with_topic_issues']} with topic issues[/magenta], "
         f"[green]{summary['clean']} clean[/green]"
     )
+    if "without_standard_tag" in summary:
+        console.print(
+            f"[yellow]{summary['without_standard_tag']} without a standard tag[/yellow]"
+        )
