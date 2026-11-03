@@ -1,7 +1,13 @@
 """Pytest configuration and shared fixtures."""
 
+import os
+
 import pytest
 import responses
+
+# Rich reads the terminal width when the console is created, which happens at
+# import time. Keep help output wide even on a narrow CI runner.
+os.environ["COLUMNS"] = "200"
 
 
 @pytest.fixture
