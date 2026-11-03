@@ -5,8 +5,10 @@ Generate and update repository descriptions using LLM-powered analysis.
 ## Usage
 
 ```bash
-gh-toolkit repo describe <REPOS_INPUT> [OPTIONS]
+gh-toolkit repo describe [REPOS_INPUT] [OPTIONS]
 ```
+
+`REPOS_INPUT` is optional when using `--from-audit` or `--apply-proposals`.
 
 ## Arguments
 
@@ -22,7 +24,14 @@ gh-toolkit repo describe <REPOS_INPUT> [OPTIONS]
 | `--dry-run` | FLAG | Preview descriptions without making changes | Execute changes |
 | `--force` | FLAG | Update description even if one already exists | Skip existing |
 | `--rate-limit`, `-r` | FLOAT | Seconds between API requests | `0.5` |
-| `--output`, `-o` | PATH | Save results to JSON file | |
+| `--output`, `-o` | PATH | Save results or proposed changes to JSON | |
+| `--from-audit` | PATH | Fix descriptions selected by a `repo audit` report | |
+| `--only` | TEXT | With `--from-audit`: `missing`, `truncated`, `spelling` (repeatable) | all |
+| `--spelling` | TEXT | Enforce a spelling variant, currently `en-AU` | |
+| `--backup` | PATH | Write current descriptions before applying | |
+| `--apply-proposals` | PATH | Apply exact changes from a saved proposals file | |
+| `--include-archived` | FLAG | Temporarily unarchive, update, then rearchive | skip archived |
+| `--yes`, `-y` | FLAG | Skip the confirmation prompt | |
 | `--help` | FLAG | Show help message | |
 
 ## Examples
@@ -65,6 +74,32 @@ gh-toolkit repo describe repos.txt --output results.json
 # Force update existing descriptions
 gh-toolkit repo describe "myorg/*" --force --rate-limit 1.0
 ```
+
+
+### Audit-driven description fixes
+
+Use the read-only audit to select the repos that need work, generate proposals,
+review them, then apply exactly those proposals.
+
+```bash
+# 1. Audit and back up
+gh-toolkit repo audit --user --include-private \
+  --output audit.json --backup backup.json
+
+# 2. Generate proposals, no writes
+gh-toolkit repo describe --from-audit audit.json \
+  --only missing --only truncated --only spelling \
+  --spelling en-AU --dry-run \
+  --output proposals.json --backup backup-before.json
+
+# 3. Apply the reviewed proposals
+gh-toolkit repo describe --apply-proposals proposals.json \
+  --backup backup-before-apply.json --yes
+```
+
+Archived repositories are skipped by default. Pass `--include-archived` to
+temporarily unarchive each one, update the description, and archive it again.
+GitHub does not allow metadata edits while a repository is archived.
 
 ### From File
 

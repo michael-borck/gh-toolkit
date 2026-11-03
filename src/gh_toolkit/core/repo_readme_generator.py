@@ -392,17 +392,21 @@ class RepoReadmeGenerator:
             True if successful, False otherwise
         """
         try:
-            # Get current README to get its SHA (needed for update)
+            # Get the actual README path and SHA. Repos may use readme.md,
+            # README.rst, etc.; writing to a hardcoded README.md would create a
+            # second file on case-sensitive filesystems.
             readme_path = "README.md"
             current_sha = None
 
             try:
                 response = self.client.request(
                     "GET",
-                    f"/repos/{owner}/{repo}/contents/{readme_path}",
+                    f"/repos/{owner}/{repo}/readme",
                 )
                 if response.ok:
-                    current_sha = response.json().get("sha")
+                    data = response.json()
+                    readme_path = data.get("path") or readme_path
+                    current_sha = data.get("sha")
             except Exception:
                 pass  # README doesn't exist, we'll create it
 

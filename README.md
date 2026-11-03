@@ -148,6 +148,17 @@ gh-toolkit repo badges "user/*" --apply  # Auto-update READMEs
 gh-toolkit repo health user/repo --rules professional --min-score 80
 gh-toolkit repo health "user/*" --json | jq '.[] | {repo: .repository, grade}'
 
+# Audit descriptions, Australian spelling, and topics; write a backup
+gh-toolkit repo audit --user --include-private --json
+gh-toolkit repo audit --user --include-private \
+  --output audit.json --backup gh-toolkit-backup.json
+
+# Fix descriptions selected by the audit: propose, review, then apply
+gh-toolkit repo describe --from-audit audit.json \
+  --only missing --only truncated --only spelling --spelling en-AU \
+  --dry-run --output proposals.json --backup before.json
+gh-toolkit repo describe --apply-proposals proposals.json --yes
+
 # Custom rubric: re-weight checks, set grade thresholds, mark checks required
 gh-toolkit repo health user/repo --rubric example_rubric.yaml
 

@@ -144,7 +144,7 @@ class TestDescriptionGenerator:
         assert description == "A quoted description"
 
     def test_generate_with_llm_truncates_long(self, mock_github_token, mocker):
-        """Test that LLM response is truncated to 250 chars."""
+        """Test that LLM response is truncated to 240 chars."""
         mock_anthropic_client = mocker.Mock()
         long_desc = "A" * 300  # 300 chars
         mock_response = mocker.Mock()
@@ -159,7 +159,7 @@ class TestDescriptionGenerator:
 
         description = generator._generate_with_llm(repo_data, "")
 
-        assert len(description) == 250
+        assert len(description) == 240
 
     def test_generate_with_llm_error_returns_none(self, mock_github_token, mocker):
         """Test that LLM errors return None."""

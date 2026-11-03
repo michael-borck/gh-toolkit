@@ -224,6 +224,15 @@ class RepositoryHealthChecker:
         except Exception:
             repo_data["workflows"] = []
 
+        # GitHub's repo object has no has_releases field; ask the releases
+        # endpoint. Callers that pass repo_data directly can still set it.
+        if "has_releases" not in repo_data:
+            try:
+                releases = self.client.get_repo_releases(owner, repo)
+                repo_data["has_releases"] = bool(releases)
+            except Exception:
+                repo_data["has_releases"] = False
+
         return repo_data
 
     def _check_documentation(self, repo_data: dict[str, Any]) -> list[HealthCheck]:
@@ -311,8 +320,8 @@ class RepositoryHealthChecker:
         # Topics check
         topics = repo_data.get("topics", [])
         has_topics = len(topics) > 0
-        topic_score = min(len(topics), 5) * (
-            self.weights["documentation"]["topics"] // 5
+        topic_score = round(
+            min(len(topics), 5) * self.weights["documentation"]["topics"] / 5
         )
 
         checks.append(

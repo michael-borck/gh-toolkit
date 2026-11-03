@@ -162,18 +162,24 @@ cython_debug/
 .vscode/
 
 # uv
+# uv.lock is committed: this is an application, and a pinned environment is
+# required for reproducible CI and type-check results.
 .uv/
-uv.lock
 
 # Ruff
 .ruff_cache/
 
-# Generated files
-*.html
-*.json
-repos_data.json
-repos_summary.md
+# Generated outputs (keep this list specific so fixtures and configs are not
+# hidden by broad *.json / *.html patterns)
+portfolio_site.html
+portfolio.html
+class_portfolio.html
+index.html
 educational_tools_landing_page.html
+repos_data.json
+portfolio_data.json
+audit-report.json
+repos_summary.md
 
 # API keys and secrets
 .env
@@ -185,3 +191,7 @@ secrets.yaml
 *.temp
 .DS_Store
 Thumbs.db
+# macOS AppleDouble files, common on external drives
+._*
+# Local audit outputs
+audit-output/

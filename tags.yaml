@@ -1,0 +1,82 @@
+# Standard tag vocabulary.
+#
+# Two questions, eight tags:
+#
+#   1. What is it?      web-app, desktop-app, cli, book
+#   2. What is it about? ai, education, cybersecurity, research, operations
+#
+# A repository can answer both questions. Free tags add specificity, up to the
+# --free-tags limit. Keep the standard set small; put everything else in free
+# tags.
+#
+# Tag names: lowercase, letters, numbers, and hyphens only, max 50 characters.
+# GitHub allows up to 20 topics per repository.
+
+name: Two-question standard tags
+version: 3
+
+tags:
+  # What is it?
+  web-app:
+    description: Browser-based applications, websites, dashboards, and interactive pages.
+    examples:
+      - static sites, single-page apps, web dashboards, landing pages
+    exclusions:
+      - command-line tools, desktop-only apps, books without a web app
+
+  desktop-app:
+    description: Standalone desktop applications.
+    examples:
+      - Electron, Tauri, native desktop apps
+    exclusions:
+      - web apps, CLI-only tools
+
+  cli:
+    description: Command-line tools and terminal utilities.
+    examples:
+      - CLI wrappers, shell tools, terminal workflows
+    exclusions:
+      - web apps, desktop GUIs, libraries with no command-line entry point
+
+  book:
+    description: Books, book source, long-form guides, and companion materials.
+    examples:
+      - Quarto books, open-access books, book companion sites
+    exclusions:
+      - short blog posts, single-page tutorials
+
+  # What is it about?
+  ai:
+    description: Tools, books, experiments, and teaching materials about artificial intelligence, LLMs, or machine learning.
+    examples:
+      - LLM tools, AI books, prompt tooling, model benchmarks
+    exclusions:
+      - general software that does not use or teach AI
+
+  education:
+    description: Teaching materials, courseware, labs, assessments, and tools for educators or students.
+    examples:
+      - course repos, lesson plans, labs, rubrics, classroom tools
+    exclusions:
+      - research papers with no teaching use, general-purpose libraries
+
+  cybersecurity:
+    description: Security labs, offensive and defensive security tools, and cybersecurity teaching.
+    examples:
+      - penetration testing labs, defence-in-depth, security audits
+    exclusions:
+      - general IT or networking content without a security focus
+
+  research:
+    description: Research projects, experiments, papers, benchmarks, and analysis code.
+    examples:
+      - research prototypes, papers, datasets, evaluation harnesses
+    exclusions:
+      - teaching materials, general product code
+
+  operations:
+    description: Private operating workspaces, indexes, and internal admin repos that coordinate a practice, series, or course.
+    examples:
+      - consulting HQ, book-series HQ, course-unit HQ, internal indexes
+    exclusions:
+      - public apps, published books, course materials themselves

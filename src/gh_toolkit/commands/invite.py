@@ -243,11 +243,13 @@ def leave_repositories(
             console.print(f"[red]Error getting user info: {e.message}[/red]")
             raise typer.Exit(1) from e
 
-        # Get all repositories where user is a collaborator
+        # Only direct collaborator repos. Including organization_member here
+        # would list every repo in every org the user belongs to and then
+        # report "left" for repos where they were never a collaborator.
         console.print("[blue]Fetching repositories...[/blue]")
         try:
             all_repos = client.get_user_repos(
-                visibility="all", affiliation="collaborator,organization_member"
+                visibility="all", affiliation="collaborator"
             )
         except GitHubAPIError as e:
             console.print(f"[red]Error fetching repositories: {e.message}[/red]")

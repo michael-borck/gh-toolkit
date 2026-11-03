@@ -41,6 +41,7 @@ class TopicTagger:
         self.model = model or self.DEFAULT_MODEL
         self.preferred_tags = preferred_tags
         self.max_topics = max_topics
+        self._anthropic_client: Any = None
 
         if anthropic_api_key:
             try:
@@ -87,7 +88,7 @@ README excerpt:
 {readme[:2000] if readme else "No README available"}
 """
 
-        prompt = f"""Based on the following GitHub repository information, suggest 5-{self.max_topics} relevant topic tags that would help users discover this repository. Topics should be lowercase, use hyphens instead of spaces, and be commonly used GitHub topics.
+        prompt = f"""Based on the following GitHub repository information, suggest up to {self.max_topics} relevant topic tags that would help users discover this repository. Topics should be lowercase, use hyphens instead of spaces, and be commonly used GitHub topics.
 
 {context}
 
@@ -113,7 +114,6 @@ IMPORTANT: Consider using these preferred tags when applicable:
             response = self._anthropic_client.messages.create(
                 model=self.model,
                 max_tokens=200,
-                temperature=0.7,
                 messages=[{"role": "user", "content": prompt}],
             )
 
@@ -135,9 +135,7 @@ IMPORTANT: Consider using these preferred tags when applicable:
                 ):
                     valid_topics.append(topic)
 
-            return valid_topics[
-                : self.max_topics
-            ]  # Cap at max_topics (default 8)
+            return valid_topics[: self.max_topics]  # Cap at max_topics (default 8)
 
         except Exception as e:
             console.print(f"[yellow]⚠ Error generating topics with LLM: {e}[/yellow]")
@@ -240,21 +238,8 @@ IMPORTANT: Consider using these preferred tags when applicable:
         cleaned_topics = [t.lower().replace(" ", "-") for t in topics]
 
         try:
-            # Need to use PUT request with special headers for topics
-            import requests
-
-            url = f"https://api.github.com/repos/{owner}/{repo}/topics"
-            headers = {
-                "Authorization": f"token {self.client.token}",
-                "Accept": "application/vnd.github.mercy-preview+json",  # Required for topics API
-            }
-
-            response = requests.put(
-                url, headers=headers, json={"names": cleaned_topics}
-            )
-            response.raise_for_status()
-            return True
-        except Exception as e:
+            return self.client.set_repo_topics(owner, repo, cleaned_topics)
+        except GitHubAPIError as e:
             console.print(f"[red]Error updating topics for {owner}/{repo}: {e}[/red]")
             return False
 
@@ -353,7 +338,9 @@ IMPORTANT: Consider using these preferred tags when applicable:
             if force and current_topics:
                 # Combine and deduplicate
                 all_topics = list(dict.fromkeys(current_topics + suggested_topics))
-                final_topics = all_topics[: self.max_topics]  # Cap at max_topics (default 8)
+                final_topics = all_topics[
+                    : self.max_topics
+                ]  # Cap at max_topics (default 8)
             else:
                 final_topics = suggested_topics
 

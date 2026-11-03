@@ -7,6 +7,7 @@ from rich.console import Console
 
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
 from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
+from gh_toolkit.core.spelling import apply_australian_spelling, truncate_at_word
 
 console = Console()
 
@@ -22,6 +23,7 @@ class DescriptionGenerator:
         anthropic_api_key: str | None = None,
         rate_limit: float = 0.5,
         model: str | None = None,
+        spelling: str | None = None,
     ):
         """Initialize with GitHub client and optional Anthropic API key.
 
@@ -30,11 +32,14 @@ class DescriptionGenerator:
             anthropic_api_key: Optional Anthropic API key for LLM features
             rate_limit: Seconds to wait between API requests (default: 0.5)
             model: Anthropic model to use (default: claude-haiku-4-5)
+            spelling: Optional spelling variant, currently ``en-AU``
         """
         self.client = github_client
         self.anthropic_api_key = anthropic_api_key
         self.rate_limit = rate_limit
         self.model = model or self.DEFAULT_MODEL
+        self.spelling = spelling
+        self._anthropic_client: Any = None
 
         if anthropic_api_key:
             try:
@@ -114,9 +119,13 @@ class DescriptionGenerator:
         if readme:
             context += f"\nREADME excerpt:\n{readme[:1500]}\n"
 
-        prompt = f"""Generate a concise one-line description (max 250 chars) for this GitHub repository.
+        spelling_line = (
+            "Use Australian English spelling." if self.spelling == "en-AU" else ""
+        )
+        prompt = f"""Generate a concise one-line description (max 240 chars) for this GitHub repository.
 The description should explain what the project does, not use marketing language.
 Do not start with "A" or "This". Use active voice.
+{spelling_line}
 Only output the description, nothing else.
 
 {context}"""
@@ -125,7 +134,6 @@ Only output the description, nothing else.
             response = self._anthropic_client.messages.create(
                 model=self.model,
                 max_tokens=300,
-                temperature=0.3,
                 messages=[{"role": "user", "content": prompt}],
             )
 
@@ -136,7 +144,9 @@ Only output the description, nothing else.
             if description:
                 # Remove surrounding quotes if present
                 description = description.strip("\"'")
-                return description[:250]
+                if self.spelling == "en-AU":
+                    description = apply_australian_spelling(description)
+                return truncate_at_word(description, 240)
 
             return None
 

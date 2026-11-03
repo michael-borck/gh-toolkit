@@ -210,17 +210,29 @@ class LicenseManager:
                 "utf-8"
             )
 
-            # Check if LICENSE file exists
+            # Find the existing license file, if any. Repos may use
+            # LICENSE.md, COPYING, LICENCE, etc.
+            license_path = "LICENSE"
             license_sha = None
-            try:
-                response = self.client.request(
-                    "GET",
-                    f"/repos/{owner}/{repo}/contents/LICENSE",
-                )
-                if response.ok:
-                    license_sha = response.json().get("sha")
-            except Exception:
-                pass
+            for candidate in (
+                "LICENSE",
+                "LICENSE.md",
+                "LICENSE.txt",
+                "LICENCE",
+                "COPYING",
+                "COPYING.md",
+            ):
+                try:
+                    response = self.client.request(
+                        "GET",
+                        f"/repos/{owner}/{repo}/contents/{candidate}",
+                    )
+                    if response.ok:
+                        license_path = candidate
+                        license_sha = response.json().get("sha")
+                        break
+                except Exception:
+                    continue
 
             # Prepare request data
             data: dict[str, Any] = {
@@ -234,7 +246,7 @@ class LicenseManager:
             # Create/update the file
             response = self.client.request(
                 "PUT",
-                f"/repos/{owner}/{repo}/contents/LICENSE",
+                f"/repos/{owner}/{repo}/contents/{license_path}",
                 json_data=data,
             )
 

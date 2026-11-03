@@ -212,7 +212,12 @@ class TestRepoCloner:
         target_path = repo_cloner.get_target_path("owner", "repo")
         target_path.mkdir(parents=True, exist_ok=True)
 
-        mock_run.return_value = Mock(returncode=0, stderr="")
+        def fake_run(cmd, **kwargs):
+            if cmd[:2] == ["git", "clone"]:
+                Path(cmd[-1]).mkdir(parents=True, exist_ok=True)
+            return Mock(returncode=0, stderr="")
+
+        mock_run.side_effect = fake_run
 
         result = repo_cloner.clone_repository("owner/repo", skip_existing=False)
 
@@ -393,6 +398,8 @@ class TestRepoCloner:
             # All threads that got past the claim would land here together
             with call_lock:
                 clone_calls.append(cmd)
+            if cmd[:2] == ["git", "clone"]:
+                Path(cmd[-1]).mkdir(parents=True, exist_ok=True)
             return Mock(returncode=0, stdout="", stderr="")
 
         def attempt():
@@ -415,25 +422,96 @@ class TestRepoCloner:
 
     def test_parse_repo_input_rejects_traversal(self, repo_cloner):
         """Owner/repo names that could escape the target dir are rejected."""
-        for bad in ["../etc/passwd", "owner/..", "owner/re po"]:
+        for bad in [
+            "../etc/passwd",
+            "owner/..",
+            "owner/re po",
+            "https://github.com/../../evil/repo",
+            "https://github.com/owner/..",
+            "git@github.com:../..",
+        ]:
             with pytest.raises(ValueError):
                 repo_cloner.parse_repo_input(bad)
 
-    @patch("shutil.rmtree")
-    def test_cleanup_failed_clones(self, mock_rmtree, repo_cloner, tmp_path):
-        """Test cleanup of failed clone directories."""
-        # Create some test directories
-        failed_path1 = tmp_path / "failed1"
-        failed_path2 = tmp_path / "failed2"
-        success_path = tmp_path / "success"
+    def test_get_target_path_rejects_escape(self, repo_cloner):
+        """Defence in depth: the resolved target must stay under target_dir."""
+        with pytest.raises(ValueError):
+            repo_cloner.get_target_path("..", "..")
 
-        failed_path1.mkdir()
-        failed_path2.mkdir()
-        success_path.mkdir()
+    def test_clone_invalid_input_has_no_cleanup_path(self, repo_cloner):
+        """A parse failure must not nominate the current directory for cleanup."""
+        result = repo_cloner.clone_repository("not-a-valid-repo")
+
+        assert result.success is False
+        assert result.cleanup_path is None
+
+    def test_overwrite_failure_keeps_existing_directory(self, repo_cloner):
+        """A failed --overwrite clone must leave the existing checkout intact."""
+        existing = repo_cloner.target_dir / "owner" / "repo"
+        existing.mkdir(parents=True)
+        marker = existing / "local-work.txt"
+        marker.write_text("do not delete")
+
+        with patch(
+            "subprocess.run",
+            return_value=Mock(returncode=1, stderr="clone failed"),
+        ):
+            result = repo_cloner.clone_repository("owner/repo", skip_existing=False)
+
+        assert result.success is False
+        assert marker.exists()
+        assert marker.read_text() == "do not delete"
+
+    def test_overwrite_success_replaces_existing_directory(self, repo_cloner):
+        """A successful --overwrite clone swaps the new checkout into place."""
+        existing = repo_cloner.target_dir / "owner" / "repo"
+        existing.mkdir(parents=True)
+        (existing / "old.txt").write_text("old")
+
+        def fake_run(cmd, **kwargs):
+            if cmd[:2] == ["git", "clone"]:
+                target = Path(cmd[-1])
+                target.mkdir(parents=True)
+                (target / "new.txt").write_text("new")
+                return Mock(returncode=0, stderr="")
+            return Mock(returncode=1, stderr="")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            result = repo_cloner.clone_repository("owner/repo", skip_existing=False)
+
+        assert result.success is True
+        assert (existing / "new.txt").exists()
+        assert not (existing / "old.txt").exists()
+
+    @patch("shutil.rmtree")
+    def test_cleanup_failed_clones(self, mock_rmtree, repo_cloner):
+        """Test cleanup of failed clone directories."""
+        # Create some test directories inside the cloner's target root
+        failed_path1 = repo_cloner.target_dir / "failed1"
+        failed_path2 = repo_cloner.target_dir / "failed2"
+        success_path = repo_cloner.target_dir / "success"
+
+        failed_path1.mkdir(parents=True)
+        failed_path2.mkdir(parents=True)
+        success_path.mkdir(parents=True)
 
         results = [
-            CloneResult("failed1", "url1", failed_path1, False, error="Failed"),
-            CloneResult("failed2", "url2", failed_path2, False, error="Failed"),
+            CloneResult(
+                "failed1",
+                "url1",
+                failed_path1,
+                False,
+                error="Failed",
+                cleanup_path=failed_path1,
+            ),
+            CloneResult(
+                "failed2",
+                "url2",
+                failed_path2,
+                False,
+                error="Failed",
+                cleanup_path=failed_path2,
+            ),
             CloneResult("success", "url3", success_path, True),
             CloneResult("skipped", "url4", Path("nonexistent"), False, skipped=True),
         ]
@@ -444,22 +522,69 @@ class TestRepoCloner:
         assert mock_rmtree.call_count == 2
 
     @patch("shutil.rmtree")
-    def test_cleanup_failed_clones_ignore_errors(
-        self, mock_rmtree, repo_cloner, tmp_path
-    ):
+    def test_cleanup_failed_clones_ignore_errors(self, mock_rmtree, repo_cloner):
         """Test cleanup ignores errors during removal."""
         mock_rmtree.side_effect = OSError("Permission denied")
 
-        failed_path = tmp_path / "failed"
-        failed_path.mkdir()
+        failed_path = repo_cloner.target_dir / "failed"
+        failed_path.mkdir(parents=True)
 
         results = [
-            CloneResult("failed", "url", failed_path, False, error="Failed"),
+            CloneResult(
+                "failed",
+                "url",
+                failed_path,
+                False,
+                error="Failed",
+                cleanup_path=failed_path,
+            ),
         ]
 
         # Should not raise exception
         cleaned = repo_cloner.cleanup_failed_clones(results)
         assert cleaned == 0  # No successful cleanups due to error
+
+    def test_cleanup_failed_clones_ignores_cwd(
+        self, repo_cloner, tmp_path, monkeypatch
+    ):
+        """A failure without a known target must never delete the working dir."""
+        work = tmp_path / "work"
+        work.mkdir()
+        marker = work / "important.txt"
+        marker.write_text("keep me")
+        monkeypatch.chdir(work)
+
+        result = CloneResult(
+            "bad-input", "", Path(), False, error="Invalid repository format"
+        )
+
+        cleaned = repo_cloner.cleanup_failed_clones([result])
+
+        assert cleaned == 0
+        assert marker.exists()
+
+    def test_cleanup_failed_clones_ignores_paths_outside_target(
+        self, repo_cloner, tmp_path
+    ):
+        """Cleanup must not follow a path that escaped the target directory."""
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        marker = outside / "keep.txt"
+        marker.write_text("keep me")
+
+        result = CloneResult(
+            "owner/repo",
+            "url",
+            outside,
+            False,
+            error="Failed",
+            cleanup_path=outside,
+        )
+
+        cleaned = repo_cloner.cleanup_failed_clones([result])
+
+        assert cleaned == 0
+        assert marker.exists()
 
 
 class TestDeadlineSnapshot:

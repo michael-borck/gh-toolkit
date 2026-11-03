@@ -35,7 +35,7 @@ class RepositoryExtractor:
         self.anthropic_api_key = anthropic_api_key
 
         # Initialize Anthropic client if key provided
-        self._anthropic_client = None
+        self._anthropic_client: Any = None
         if anthropic_api_key:
             try:
                 from anthropic import Anthropic
@@ -85,7 +85,7 @@ class RepositoryExtractor:
 
         # Categorize the repository
         category, category_details = self._categorize_repository(
-            repo_data, readme_content, topics, languages
+            repo_data, readme_content, topics, languages, download_links
         )
 
         # Build comprehensive data structure
@@ -225,9 +225,16 @@ class RepositoryExtractor:
             output_file: Output file path
         """
         output_path = Path(output_file)
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(repos_data, f, indent=2, ensure_ascii=False)
+        # Write to a sibling temp file and replace atomically. --resume saves
+        # after every repo, so a crash mid-write must not truncate the file.
+        tmp_path = output_path.with_name(output_path.name + ".tmp")
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(repos_data, f, indent=2, ensure_ascii=False)
+            tmp_path.replace(output_path)
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink()
 
         console.print(f"[green]✓ Data saved to {output_path}[/green]")
 
@@ -296,6 +303,7 @@ class RepositoryExtractor:
         readme: str,
         topics: list[str],
         languages: dict[str, int],
+        download_links: dict[str, str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Categorize repository using rule-based system and optionally LLM.
 
@@ -306,7 +314,7 @@ class RepositoryExtractor:
         if self._anthropic_client:
             try:
                 llm_result = self._categorize_with_llm(
-                    repo_data, readme, topics, languages
+                    repo_data, readme, topics, languages, download_links
                 )
                 if llm_result:
                     return llm_result
@@ -316,7 +324,9 @@ class RepositoryExtractor:
                 )
 
         # Fallback to rule-based categorization
-        return self._categorize_with_rules(repo_data, readme, topics, languages)
+        return self._categorize_with_rules(
+            repo_data, readme, topics, languages, download_links
+        )
 
     def _categorize_with_rules(
         self,
@@ -324,6 +334,7 @@ class RepositoryExtractor:
         readme: str,
         topics: list[str],
         languages: dict[str, int],
+        download_links: dict[str, str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Rule-based repository categorization."""
         name_lower = repo_data["name"].lower()
@@ -349,8 +360,10 @@ class RepositoryExtractor:
                 "reason": "Desktop framework detected in topics",
             }
 
-        # Check for desktop downloads
-        if repo_data.get("has_downloads") and languages_list:
+        # Check for desktop downloads. Use actual release assets, not the
+        # GitHub repo flag `has_downloads`, which only means the downloads tab
+        # is enabled and is true for almost every repository.
+        if download_links and languages_list:
             primary_lang = languages_list[0] if languages_list else ""
             if primary_lang in ["C++", "C#", "Java", "Rust", "Go"]:
                 return "Desktop Application", {
@@ -505,6 +518,7 @@ class RepositoryExtractor:
         readme: str,
         topics: list[str],
         languages: dict[str, int],
+        download_links: dict[str, str] | None = None,
     ) -> tuple[str, dict[str, Any]] | None:
         """LLM-powered repository categorization using Anthropic Claude."""
         if not self._anthropic_client:
@@ -518,7 +532,7 @@ All Languages: {", ".join(languages.keys()) if languages else "Unknown"}
 Topics: {", ".join(topics) if topics else "None"}
 Stars: {repo_data.get("stargazers_count", 0)}
 Is Fork: {repo_data.get("fork", False)}
-Has Downloads: {repo_data.get("has_downloads", False)}
+Has Downloads: {bool(download_links)}
 Has Pages: {repo_data.get("has_pages", False)}
 Homepage: {repo_data.get("homepage", "None")}
 
@@ -543,7 +557,6 @@ Respond with ONLY the category name from the list above. Choose the most specifi
             response = self._anthropic_client.messages.create(
                 model=DEFAULT_LLM_MODEL,
                 max_tokens=50,
-                temperature=0.3,
                 messages=[{"role": "user", "content": prompt}],
             )
 

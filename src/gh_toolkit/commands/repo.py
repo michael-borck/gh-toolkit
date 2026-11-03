@@ -1,19 +1,23 @@
 """Repository management commands."""
 
+import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, cast
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
+from gh_toolkit.core.audit import build_backup, write_json_atomic
 from gh_toolkit.core.config import resolve_token
+from gh_toolkit.core.description_generator import DescriptionGenerator
 from gh_toolkit.core.github_client import GitHubAPIError, GitHubClient
 from gh_toolkit.core.health_checker import HealthReport, RepositoryHealthChecker
 from gh_toolkit.core.llm import DEFAULT_LLM_MODEL
 from gh_toolkit.core.repo_cloner import CloneResult, CloneStats, RepoCloner
 from gh_toolkit.core.repo_extractor import RepositoryExtractor
+from gh_toolkit.core.spelling import apply_australian_spelling
 
 console = Console()
 err_console = Console(stderr=True)
@@ -559,7 +563,7 @@ def health_check(
                     None, visibility="all", affiliation="owner"
                 )
             else:
-                user_repos = client.get_user_repos(owner)
+                user_repos = client.get_repos_for_owner(owner)
 
             repo_list = [f"{owner}/{r['name']}" for r in user_repos]
             console.print(
@@ -995,7 +999,9 @@ def _post_health_feedback(
         title = feedback_title(report)
         body = feedback_body(report)
         try:
-            existing = find_marker_issue(client.get_repo_issues(owner, repo))
+            existing = find_marker_issue(
+                client.get_repo_issues(owner, repo, state="all")
+            )
             if existing:
                 client.update_issue(owner, repo, existing["number"], title, body)
                 console.print(
@@ -1132,6 +1138,10 @@ def clone_repos(
     """Clone GitHub repositories with smart organization and parallel processing."""
 
     try:
+        if parallel < 1:
+            console.print("[red]Error: --parallel must be at least 1[/red]")
+            raise typer.Exit(1)
+
         # A deadline snapshot needs full history; shallow clones can't reach an
         # older commit. Drop --depth with a warning rather than silently failing.
         if before is not None and depth is not None:
@@ -1260,8 +1270,13 @@ def clone_repos(
         # Show results
         _display_clone_results(results, stats, cleaned_up)
 
-        # Exit with error code if there were failures and not continuing on error
-        if stats.failed > 0 and not continue_on_error:
+        # Surface partial failures to CI/scripts. The clone loop always keeps
+        # going; --fail-fast only changes the exit status.
+        if stats.failed > 0:
+            if continue_on_error:
+                console.print(
+                    "[dim]Some repositories failed; exiting with status 1.[/dim]"
+                )
             raise typer.Exit(1)
 
     except KeyboardInterrupt as e:
@@ -1413,8 +1428,47 @@ def _display_clone_results(
 
 
 def describe_repos(
-    repos_input: str = typer.Argument(
-        help="Repository (owner/repo), file with repo list, or 'username/*' for all user repos"
+    repos_input: str | None = typer.Argument(
+        None,
+        help="Repository (owner/repo), file with repo list, or 'username/*' for all user repos",
+    ),
+    from_audit: str | None = typer.Option(
+        None,
+        "--from-audit",
+        help="Fix descriptions selected by a repo audit JSON report",
+    ),
+    apply_proposals: str | None = typer.Option(
+        None,
+        "--apply-proposals",
+        help="Apply changes from a saved description-proposals JSON file",
+    ),
+    include_archived: bool = typer.Option(
+        False,
+        "--include-archived",
+        help="Temporarily unarchive archived repos, update them, then rearchive",
+    ),
+    only: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--only",
+            help="With --from-audit: missing, truncated, spelling (repeatable)",
+        ),
+    ] = None,
+    spelling: str | None = typer.Option(
+        None,
+        "--spelling",
+        help="Spelling variant to enforce, currently en-AU",
+    ),
+    backup: str | None = typer.Option(
+        None,
+        "--backup",
+        help="With --from-audit: write current descriptions before applying",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="With --from-audit: skip the confirmation prompt",
     ),
     token: str | None = typer.Option(
         None,
@@ -1482,9 +1536,55 @@ def describe_repos(
                 "[dim]For better results, set ANTHROPIC_API_KEY env var or use --anthropic-key[/dim]"
             )
 
+        if spelling not in (None, "en-AU"):
+            console.print(
+                f"[red]Unsupported spelling variant: {spelling}. Use en-AU.[/red]"
+            )
+            raise typer.Exit(1)
+
         # Initialize clients
         client = GitHubClient(github_token)
-        generator = DescriptionGenerator(client, anthropic_api_key, rate_limit, model)
+        generator = DescriptionGenerator(
+            client, anthropic_api_key, rate_limit, model, spelling
+        )
+
+        if from_audit and apply_proposals:
+            console.print(
+                "[red]Error: use --from-audit or --apply-proposals, not both[/red]"
+            )
+            raise typer.Exit(1)
+
+        if apply_proposals:
+            _apply_description_proposals(
+                client=client,
+                proposals_path=apply_proposals,
+                backup_path=backup,
+                dry_run=dry_run,
+                assume_yes=yes,
+                include_archived=include_archived,
+                output=output,
+            )
+            return
+
+        if from_audit:
+            _describe_from_audit(
+                client=client,
+                generator=generator,
+                audit_path=from_audit,
+                only=only,
+                backup_path=backup,
+                dry_run=dry_run,
+                assume_yes=yes,
+                include_archived=include_archived,
+                output=output,
+            )
+            return
+
+        if not repos_input:
+            console.print(
+                "[red]Error: provide a repository input or use --from-audit[/red]"
+            )
+            raise typer.Exit(1)
 
         # Parse repository input
         repo_list = _parse_describe_repos_input(repos_input, client)
@@ -1513,6 +1613,9 @@ def describe_repos(
         if output:
             _save_describe_results(results, output, dry_run, force)
 
+        if any(result.get("status") == "error" for result in results):
+            raise typer.Exit(1)
+
     except KeyboardInterrupt as e:
         console.print("\n[yellow]Operation cancelled by user[/yellow]")
         raise typer.Exit(1) from e
@@ -1521,6 +1624,324 @@ def describe_repos(
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e
+
+
+def _describe_from_audit(
+    client: GitHubClient,
+    generator: DescriptionGenerator,
+    audit_path: str,
+    only: list[str] | None,
+    backup_path: str | None,
+    dry_run: bool,
+    assume_yes: bool,
+    include_archived: bool,
+    output: str | None,
+) -> None:
+    """Fix descriptions selected by a repo audit report."""
+    audit_file = Path(audit_path)
+    try:
+        report = json.loads(audit_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        console.print(f"[red]Could not read audit report {audit_file}: {e}[/red]")
+        raise typer.Exit(1) from e
+
+    if report.get("format") != "gh-toolkit-audit":
+        console.print("[red]Not a gh-toolkit audit report[/red]")
+        raise typer.Exit(1)
+
+    kinds = set(only or ["missing", "truncated", "spelling"])
+    unknown = kinds - {"missing", "truncated", "spelling"}
+    if unknown:
+        console.print(f"[red]Unknown --only values: {', '.join(sorted(unknown))}[/red]")
+        raise typer.Exit(1)
+
+    targets: dict[str, set[str]] = {}
+    for repo in report.get("repos", []):
+        full_name = repo.get("full_name")
+        if not isinstance(full_name, str) or "/" not in full_name:
+            continue
+
+        selected: set[str] = set()
+        status = repo.get("description_status")
+        if "missing" in kinds and status == "missing":
+            selected.add("missing")
+        if "truncated" in kinds and status == "truncated":
+            selected.add("truncated")
+        if "spelling" in kinds and repo.get("spelling"):
+            selected.add("spelling")
+
+        if selected:
+            targets[full_name] = selected
+
+    if not targets:
+        console.print(
+            "[green]No matching description issues in the audit report.[/green]"
+        )
+        return
+
+    console.print(f"[blue]Fixing descriptions for {len(targets)} repositories[/blue]")
+
+    changes: list[dict[str, Any]] = []
+    current_repos: list[dict[str, Any]] = []
+
+    for full_name in sorted(targets):
+        owner, _, name = full_name.partition("/")
+        try:
+            repo_data = client.get_repo_info(owner, name)
+        except GitHubAPIError as e:
+            console.print(f"[red]✗ {full_name}: {e.message}[/red]")
+            continue
+
+        archived = bool(repo_data.get("archived"))
+        if archived and not include_archived:
+            console.print(f"[dim]Skipped archived repository: {full_name}[/dim]")
+            continue
+
+        current_repos.append(repo_data)
+        old = repo_data.get("description")
+        selected = targets[full_name]
+
+        if selected & {"missing", "truncated"}:
+            new = generator.generate_description(owner, name, repo_data)
+            mode = "regenerate"
+        else:
+            new = apply_australian_spelling(old or "")
+            mode = "spelling"
+
+        if not new:
+            console.print(f"[red]✗ {full_name}: could not generate a description[/red]")
+            continue
+        if new == old:
+            continue
+
+        changes.append(
+            {
+                "full_name": full_name,
+                "owner": owner,
+                "repo": name,
+                "mode": mode,
+                "old": old,
+                "new": new,
+                "issues": sorted(selected),
+                "archived": archived,
+            }
+        )
+
+    if not changes:
+        console.print("[green]No description changes needed.[/green]")
+        return
+
+    _display_description_changes(changes)
+
+    if backup_path:
+        write_json_atomic(
+            build_backup(current_repos, {"audit": str(audit_file)}),
+            backup_path,
+        )
+        console.print(f"[green]Backup written to {backup_path}[/green]")
+
+    if output:
+        write_json_atomic(
+            {
+                "format": "gh-toolkit-description-changes",
+                "version": 1,
+                "dry_run": dry_run,
+                "updated": 0,
+                "failed": 0,
+                "changes": changes,
+            },
+            output,
+        )
+        console.print(f"[green]Proposed changes written to {output}[/green]")
+
+    if dry_run:
+        console.print("[yellow]Dry run - no descriptions changed.[/yellow]")
+        return
+
+    if not assume_yes:
+        if not typer.confirm(f"\nUpdate {len(changes)} descriptions?"):
+            console.print("[yellow]Aborted; no descriptions changed.[/yellow]")
+            return
+
+    updated = failed = 0
+    for change in changes:
+        if _apply_description_change(client, change, include_archived):
+            console.print(f"[green]✓[/green] {change['full_name']}")
+            updated += 1
+        else:
+            console.print(f"[red]✗[/red] {change['full_name']}")
+            failed += 1
+
+    if output:
+        write_json_atomic(
+            {
+                "format": "gh-toolkit-description-changes",
+                "version": 1,
+                "dry_run": False,
+                "updated": updated,
+                "failed": failed,
+                "changes": changes,
+            },
+            output,
+        )
+        console.print(f"[green]Results written to {output}[/green]")
+
+    console.print(f"\n[bold]Updated:[/bold] {updated}, [red]failed: {failed}[/red]")
+    if failed:
+        raise typer.Exit(1)
+
+
+def _apply_description_change(
+    client: GitHubClient,
+    change: dict[str, Any],
+    include_archived: bool,
+) -> bool:
+    """Apply one description change, temporarily unarchiving if needed."""
+    owner = change["owner"]
+    repo = change["repo"]
+    full_name = change["full_name"]
+    archived = bool(change.get("archived"))
+
+    if archived:
+        if not include_archived:
+            console.print(f"[dim]Skipped archived repository: {full_name}[/dim]")
+            return False
+        if not client.set_repo_archived(owner, repo, False):
+            console.print(f"[red]✗ {full_name}: could not unarchive[/red]")
+            return False
+
+    try:
+        return client.update_repo_description(owner, repo, change["new"])
+    finally:
+        if archived and not client.set_repo_archived(owner, repo, True):
+            console.print(f"[red]⚠ Could not rearchive {full_name}[/red]")
+
+
+def _display_description_changes(changes: list[dict[str, Any]]) -> None:
+    """Show old and new descriptions in a compact table."""
+    table = Table(title=f"Proposed descriptions ({len(changes)} repositories)")
+    table.add_column("Repository", style="cyan")
+    table.add_column("Mode", style="yellow")
+    table.add_column("Old", style="white", max_width=45)
+    table.add_column("New", style="green", max_width=45)
+
+    for change in changes:
+        old = str(change["old"] or "").replace("\n", " ")
+        new = str(change["new"]).replace("\n", " ")
+        table.add_row(
+            change["full_name"],
+            change["mode"],
+            old[:42] + "..." if len(old) > 45 else old,
+            new[:42] + "..." if len(new) > 45 else new,
+        )
+
+    console.print(table)
+
+
+def _apply_description_proposals(
+    client: GitHubClient,
+    proposals_path: str,
+    backup_path: str | None,
+    dry_run: bool,
+    assume_yes: bool,
+    include_archived: bool,
+    output: str | None,
+) -> None:
+    """Apply exact old/new changes saved in a proposals JSON file."""
+    proposals_file = Path(proposals_path)
+    try:
+        data = json.loads(proposals_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        console.print(f"[red]Could not read proposals {proposals_file}: {e}[/red]")
+        raise typer.Exit(1) from e
+
+    if data.get("format") != "gh-toolkit-description-changes":
+        console.print("[red]Not a gh-toolkit description-proposals file[/red]")
+        raise typer.Exit(1)
+
+    raw_changes = data.get("changes")
+    if not isinstance(raw_changes, list) or not raw_changes:
+        console.print("[green]No changes in the proposals file.[/green]")
+        return
+
+    changes: list[dict[str, Any]] = [
+        cast(dict[str, Any], change)
+        for change in cast(list[Any], raw_changes)
+        if isinstance(change, dict)
+    ]
+    if not changes:
+        console.print("[green]No usable changes in the proposals file.[/green]")
+        return
+
+    current_repos: list[dict[str, Any]] = []
+    usable: list[dict[str, Any]] = []
+    for change in changes:
+        owner = change.get("owner")
+        repo = change.get("repo")
+        if not isinstance(owner, str) or not isinstance(repo, str):
+            continue
+        try:
+            repo_data = client.get_repo_info(owner, repo)
+        except GitHubAPIError as e:
+            console.print(f"[red]✗ {change.get('full_name')}: {e.message}[/red]")
+            continue
+        change["archived"] = bool(repo_data.get("archived"))
+        if change["archived"] and not include_archived:
+            console.print(
+                f"[dim]Skipped archived repository: {change.get('full_name')}[/dim]"
+            )
+            continue
+        current_repos.append(repo_data)
+        usable.append(change)
+
+    if not usable:
+        console.print("[red]No repositories could be read; nothing applied.[/red]")
+        raise typer.Exit(1)
+
+    _display_description_changes(usable)
+
+    if backup_path:
+        write_json_atomic(
+            build_backup(current_repos, {"proposals": str(proposals_file)}),
+            backup_path,
+        )
+        console.print(f"[green]Backup written to {backup_path}[/green]")
+
+    if dry_run:
+        console.print("[yellow]Dry run - no descriptions changed.[/yellow]")
+        return
+
+    if not assume_yes:
+        if not typer.confirm(f"\nUpdate {len(usable)} descriptions?"):
+            console.print("[yellow]Aborted; no descriptions changed.[/yellow]")
+            return
+
+    updated = failed = 0
+    for change in usable:
+        if _apply_description_change(client, change, include_archived):
+            console.print(f"[green]✓[/green] {change['full_name']}")
+            updated += 1
+        else:
+            console.print(f"[red]✗[/red] {change['full_name']}")
+            failed += 1
+
+    if output:
+        write_json_atomic(
+            {
+                "format": "gh-toolkit-description-changes",
+                "version": 1,
+                "dry_run": False,
+                "updated": updated,
+                "failed": failed,
+                "changes": usable,
+            },
+            output,
+        )
+        console.print(f"[green]Results written to {output}[/green]")
+
+    console.print(f"\n[bold]Updated:[/bold] {updated}, [red]failed: {failed}[/red]")
+    if failed:
+        raise typer.Exit(1)
 
 
 def _parse_describe_repos_input(
@@ -1556,7 +1977,7 @@ def _parse_describe_repos_input(
                     None, visibility="all", affiliation="owner"
                 )
             else:
-                user_repos = client.get_user_repos(owner)
+                user_repos = client.get_repos_for_owner(owner)
             repos = [(owner, repo["name"]) for repo in user_repos]
             console.print(f"[green]Found {len(repos)} repositories for {owner}[/green]")
             return repos
@@ -1695,6 +2116,13 @@ BADGE_COLORS: dict[str, str] = {
     "llm": "ff6f00",
     "openai": "412991",
     # Default
+    "web-app": "2196f3",
+    "desktop-app": "607d8b",
+    "cli": "455a64",
+    "education": "4caf50",
+    "operations": "546e7a",
+    "teaching": "4caf50",
+    "maker": "ff5722",
     "default": "blue",
 }
 
@@ -1810,7 +2238,7 @@ def generate_badges(
                     None, visibility="all", affiliation="owner"
                 )
             else:
-                repos = client.get_user_repos(owner)
+                repos = client.get_repos_for_owner(owner)
             repo_list = [(owner, repo["name"]) for repo in repos]
         elif "/" in repos_input:
             # Single repo
@@ -2126,8 +2554,8 @@ def readme_repos(
                 updated_repos, client, anthropic_api_key, model, rate_limit
             )
 
-        # Return the list of updated repos (useful for chaining)
-        return updated_repos  # type: ignore[return-value]
+        if any(result.get("status") in ("failed", "error") for result in results):
+            raise typer.Exit(1)
 
     except KeyboardInterrupt as e:
         console.print("\n[yellow]Operation cancelled by user[/yellow]")
@@ -2177,7 +2605,7 @@ def _parse_readme_repos_input(
                     None, visibility="all", affiliation="owner"
                 )
             else:
-                user_repos = client.get_user_repos(owner)
+                user_repos = client.get_repos_for_owner(owner)
             repos = [(owner, repo["name"]) for repo in user_repos]
             console.print(f"[green]Found {len(repos)} repositories for {owner}[/green]")
             return repos
@@ -2264,12 +2692,16 @@ def _update_tags_for_repos(
         console.print(f"[blue]Tagging {i}/{len(repos)}: {owner}/{repo}[/blue]")
         try:
             result = tagger.process_repository(owner, repo, dry_run=False, force=True)
-            if result.get("status") == "updated":
-                topics = result.get("new_topics", [])
+            status = result.get("status")
+            if status in ("success", "updated"):
+                topics = cast(
+                    list[str],
+                    result.get("final_topics") or result.get("new_topics") or [],
+                )
                 console.print(
                     f"[green]  ✓ Updated topics: {', '.join(topics[:5])}[/green]"
                 )
-            elif result.get("status") == "skipped":
+            elif status == "skipped":
                 console.print("[dim]  Skipped (already has topics)[/dim]")
             else:
                 console.print(f"[yellow]  {result.get('status', 'unknown')}[/yellow]")
@@ -2414,6 +2846,9 @@ def license_repos(
         if output:
             _save_license_results(results, output)
 
+        if any(result.get("status") == "error" for result in results):
+            raise typer.Exit(1)
+
     except KeyboardInterrupt as e:
         console.print("\n[yellow]Operation cancelled by user[/yellow]")
         raise typer.Exit(1) from e
@@ -2462,7 +2897,7 @@ def _parse_license_repos_input(
                     None, visibility="all", affiliation="owner"
                 )
             else:
-                user_repos = client.get_user_repos(owner)
+                user_repos = client.get_repos_for_owner(owner)
             repos = [(owner, repo["name"]) for repo in user_repos]
             console.print(f"[green]Found {len(repos)} repositories for {owner}[/green]")
             return repos

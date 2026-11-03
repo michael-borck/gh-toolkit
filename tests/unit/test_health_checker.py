@@ -409,3 +409,41 @@ Please read our contributing guide.
         ]
 
         assert professional_quality_score > general_quality_score
+
+
+class TestHealthScoringFixes:
+    """Regression tests for checks that silently scored zero."""
+
+    @pytest.fixture
+    def mock_github_client(self, mocker):
+        return mocker.Mock(spec=GitHubClient)
+
+    def test_topics_check_awards_points(self, mock_github_client):
+        checker = RepositoryHealthChecker(mock_github_client, "general")
+        checks = checker._check_documentation({"topics": ["python", "cli", "testing"]})
+        topics = next(c for c in checks if c.name == "Topics/Tags")
+
+        assert topics.passed is True
+        assert topics.score == 2  # 3 topics * 3 points / 5, rounded
+
+    def test_fetch_repository_data_sets_has_releases(self, mock_github_client, mocker):
+        mock_github_client.get_repo_info.return_value = {"name": "repo"}
+        mock_github_client.get_repo_readme.return_value = ""
+        mock_github_client.request.return_value = mocker.Mock(json=lambda: [])
+        mock_github_client.get_repo_releases.return_value = [{"tag_name": "v1"}]
+
+        checker = RepositoryHealthChecker(mock_github_client, "general")
+        data = checker._fetch_repository_data("user/repo")
+
+        assert data["has_releases"] is True
+
+    def test_fetch_repository_data_no_releases(self, mock_github_client, mocker):
+        mock_github_client.get_repo_info.return_value = {"name": "repo"}
+        mock_github_client.get_repo_readme.return_value = ""
+        mock_github_client.request.return_value = mocker.Mock(json=lambda: [])
+        mock_github_client.get_repo_releases.return_value = []
+
+        checker = RepositoryHealthChecker(mock_github_client, "general")
+        data = checker._fetch_repository_data("user/repo")
+
+        assert data["has_releases"] is False

@@ -480,17 +480,27 @@ def _apply_audit_fixes(
     for repo in sorted(fixes):
         owner, _, name = repo.partition("/")
         kinds = fixes[repo]
+        repo_failed = False
         try:
             if "missing_description" in kinds:
-                desc_gen.process_repository(owner, name, dry_run=dry_run)
+                result = desc_gen.process_repository(owner, name, dry_run=dry_run)
+                repo_failed = repo_failed or result.get("status") == "error"
             if "missing_topics" in kinds:
-                tagger.process_repository(owner, name, dry_run=dry_run)
+                result = tagger.process_repository(owner, name, dry_run=dry_run)
+                repo_failed = repo_failed or result.get("status") == "error"
             if "missing_license" in kinds and license_key:
-                license_mgr.add_license(owner, name, license_key, dry_run=dry_run)
-            fixed += 1
+                result = license_mgr.add_license(
+                    owner, name, license_key, dry_run=dry_run
+                )
+                repo_failed = repo_failed or result.get("status") == "error"
         except GitHubAPIError as e:
             console.print(f"  [red]✗[/red] {repo}: {e.message}")
+            repo_failed = True
+
+        if repo_failed:
             failed += 1
+        else:
+            fixed += 1
 
     verb = "Would fix" if dry_run else "Fixed"
     console.print(

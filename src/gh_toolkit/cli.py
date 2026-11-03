@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 from gh_toolkit import __version__
+from gh_toolkit.commands.audit import audit_repos
 from gh_toolkit.commands.invite import accept_invitations, leave_repositories
 from gh_toolkit.commands.org import readme as org_readme
 from gh_toolkit.commands.page import generate_page
@@ -119,6 +120,7 @@ repo_app.command("badges")(generate_badges)
 repo_app.command("health")(health_check)
 repo_app.command("roster")(roster_report)
 repo_app.command("clone")(clone_repos)
+repo_app.command("audit")(audit_repos)
 
 # Invite commands
 invite_app.command("accept")(accept_invitations)

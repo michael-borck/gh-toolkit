@@ -27,6 +27,42 @@ gh-toolkit repo tag [REPO_PATTERNS...] [OPTIONS]
 | `--output`, `-o` | PATH | Save results to JSON file | |
 | `--help` | FLAG | Show help message | |
 
+## Two-question standard vocabulary
+
+Controlled tagging uses eight standard tags, split into two questions:
+
+| Question | Tags |
+|---|---|
+| What is it? | `web-app`, `desktop-app`, `cli`, `book` |
+| What is it about? | `ai`, `education`, `cybersecurity`, `research` |
+
+A repository can answer both questions. A teaching web app about AI gets
+`web-app`, `education`, and `ai`. Free tags add specificity, up to the
+`--free-tags` limit. Keep the standard set at eight and put everything else in
+free tags.
+
+The vocabulary lives in `tags.yaml`. Each tag has a description, examples, and
+exclusions, which are passed to the classifier.
+
+## Controlled tagging workflow
+
+```bash
+# 1. Audit topics first
+gh-toolkit repo audit --user --include-private \
+  --output audit.json --backup backup.json
+
+# 2. Generate proposals for repos with no topics
+gh-toolkit repo tag --from-audit audit.json \
+  --vocabulary tags.yaml --only-missing --free-tags 2 \
+  --dry-run --output tag-proposals.json --backup before-tags.json
+
+# 3. Apply the reviewed proposals
+gh-toolkit repo tag --apply-proposals tag-proposals.json --yes
+```
+
+Archived repositories are skipped by default. Use `--include-archived` to
+temporarily unarchive, tag, and rearchive them.
+
 ## Repository Patterns
 
 Repository patterns can be specified in multiple formats:

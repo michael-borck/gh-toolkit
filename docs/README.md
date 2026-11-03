@@ -11,6 +11,7 @@ This directory contains detailed documentation for each command and subcommand i
 - [repo tag](repo-tag.md) - Add intelligent topic tags to repositories
 - [repo badges](repo-badges.md) - Generate topic badge markdown for READMEs
 - [repo health](repo-health.md) - Check repository health and best practices compliance
+- [repo audit](repo-audit.md) - Audit descriptions, spelling, and topics, and write a backup
 - [repo clone](repo-clone.md) - Clone repositories with smart organization and parallel processing
 
 ### Invitation Management
@@ -38,6 +39,7 @@ This directory contains detailed documentation for each command and subcommand i
 | `repo tag` | Add topic tags | AI-powered, preferred tags, model selection |
 | `repo badges` | Generate topic badges | Auto-apply to READMEs, multiple styles |
 | `repo health` | Check repo quality | Best practices audit, grading system |
+| `repo audit` | Audit metadata | Descriptions, spelling, topics, backup |
 | `repo clone` | Clone repositories | Parallel processing, smart organization |
 | `invite accept` | Accept invitations | Dry-run mode, bulk processing |
 | `invite leave` | Leave repositories | Confirmation prompts, safety checks |

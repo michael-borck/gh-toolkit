@@ -383,12 +383,13 @@ class PageGenerator:
         return f"""<section class="py-20 sm:py-24 lg:py-32"><div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center"><h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-stone-900 dark:text-white tracking-tight">{html.escape(title)}</h1><div class="mt-6 prose-styles max-w-3xl mx-auto">{content_html}</div><div class="mt-10 flex flex-wrap flex-col sm:flex-row justify-center items-center gap-4">{buttons_html}</div></div></section>"""
 
     def _slugify(self, text: str) -> str:
-        """Convert text to URL-friendly slug."""
-        return (
-            re.sub(r"[\s/]+", "-", text.lower().strip())
-            .replace("{", "")
-            .replace("}", "")
-        )
+        """Convert text to a safe anchor slug.
+
+        The result is interpolated into ``id`` and ``href`` attributes, so it
+        must not contain quotes, angle brackets, or other HTML metacharacters.
+        """
+        slug = re.sub(r"[^a-z0-9+]+", "-", text.lower().strip()).strip("-")
+        return slug or "section"
 
     def _render_header(self, sections: list[dict[str, Any]]) -> str:
         """Render the navigation header."""

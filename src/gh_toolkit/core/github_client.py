@@ -8,7 +8,10 @@ import requests
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from gh_toolkit import __version__
+
 console = Console()
+err_console = Console(stderr=True)
 
 
 class GitHubAPIError(Exception):
@@ -39,7 +42,7 @@ class GitHubClient:
 
         self.headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "gh-toolkit/0.1.0",
+            "User-Agent": f"gh-toolkit/{__version__}",
         }
 
         if self.token:
@@ -76,6 +79,7 @@ class GitHubClient:
         params: dict[str, Any] | None = None,
         json_data: dict[str, Any] | None = None,
         timeout: int = 30,
+        headers: dict[str, str] | None = None,
     ) -> requests.Response:
         """Make a request to GitHub API with error handling.
 
@@ -85,6 +89,7 @@ class GitHubClient:
             params: Query parameters
             json_data: JSON data for POST/PUT requests
             timeout: Request timeout in seconds
+            headers: Extra headers for this request only
 
         Returns:
             Response object
@@ -96,7 +101,12 @@ class GitHubClient:
 
         try:
             response = self.session.request(
-                method=method, url=url, params=params, json=json_data, timeout=timeout
+                method=method,
+                url=url,
+                params=params,
+                json=json_data,
+                timeout=timeout,
+                headers=headers,
             )
 
             # Check rate limiting
@@ -106,13 +116,13 @@ class GitHubClient:
                 wait_time = max(0, reset_time - current_time)
 
                 if wait_time > 0:
-                    console.print(
+                    err_console.print(
                         f"[yellow]Rate limit reached. Waiting {wait_time} seconds...[/yellow]"
                     )
                     time.sleep(wait_time + 1)
                     # Retry the request
                     return self._make_request(
-                        method, endpoint, params, json_data, timeout
+                        method, endpoint, params, json_data, timeout, headers
                     )
 
             # Check for other errors
@@ -139,6 +149,7 @@ class GitHubClient:
         params: dict[str, Any] | None = None,
         json_data: dict[str, Any] | None = None,
         timeout: int = 30,
+        headers: dict[str, str] | None = None,
     ) -> requests.Response:
         """Make a raw request to a GitHub API endpoint.
 
@@ -148,7 +159,7 @@ class GitHubClient:
         Raises:
             GitHubAPIError: If the request fails
         """
-        return self._make_request(method, endpoint, params, json_data, timeout)
+        return self._make_request(method, endpoint, params, json_data, timeout, headers)
 
     def get_paginated(
         self,
@@ -176,7 +187,7 @@ class GitHubClient:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
-            console=console,
+            console=err_console,
             transient=True,
         ) as progress:
             task = progress.add_task("Fetching data...", total=None)
@@ -257,6 +268,23 @@ class GitHubClient:
         endpoint = f"/orgs/{org_name}/repos"
         params = {"type": repo_type}
         return self.get_paginated(endpoint, params)
+
+    def get_repos_for_owner(
+        self, owner: str, repo_type: str = "all"
+    ) -> list[dict[str, Any]]:
+        """Get repositories for a user or organization, detecting which.
+
+        The users endpoint only returns public repositories for an
+        organization, so callers that support ``owner/*`` need this check to
+        include private org repositories when the token has access.
+        """
+        try:
+            info = self.get_user_info(owner)
+        except GitHubAPIError:
+            return self.get_user_repos(owner, repo_type)
+        if info.get("type") == "Organization":
+            return self.get_org_repos(owner, repo_type)
+        return self.get_user_repos(owner, repo_type)
 
     def get_user_info(self, username: str | None = None) -> dict[str, Any]:
         """Get user information.
@@ -436,6 +464,20 @@ class GitHubClient:
         except Exception:
             return []
 
+    def set_repo_topics(self, owner: str, repo: str, topics: list[str]) -> bool:
+        """Replace a repository's topics.
+
+        The topics endpoint historically required a preview media type; send
+        it explicitly so the call keeps working on older API versions.
+        """
+        response = self._make_request(
+            "PUT",
+            f"/repos/{owner}/{repo}/topics",
+            json_data={"names": topics},
+            headers={"Accept": "application/vnd.github.mercy-preview+json"},
+        )
+        return response.ok
+
     def get_repo_languages(self, owner: str, repo: str) -> dict[str, int]:
         """Get programming languages used in repository.
 
@@ -585,6 +627,22 @@ class GitHubClient:
             List of organization data
         """
         return self.get_paginated("/user/orgs")
+
+    def set_repo_archived(self, owner: str, repo: str, archived: bool) -> bool:
+        """Archive or unarchive a repository.
+
+        Archived repositories reject metadata edits, so callers that need to
+        update one must unarchive it, make the change, then archive it again.
+        """
+        try:
+            self._make_request(
+                "PATCH",
+                f"/repos/{owner}/{repo}",
+                json_data={"archived": archived},
+            )
+            return True
+        except GitHubAPIError:
+            return False
 
     def update_repo_description(self, owner: str, repo: str, description: str) -> bool:
         """Update repository description via GitHub API.

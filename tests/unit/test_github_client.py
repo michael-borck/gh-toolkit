@@ -1,5 +1,6 @@
 """Unit tests for GitHubClient."""
 
+import json
 import time
 
 import pytest
@@ -139,6 +140,20 @@ class TestGitHubClient:
         client = GitHubClient(mock_github_token)
         result = client.get_user_repos("testuser")
         assert result == sample_user_repos
+
+    @responses.activate
+    def test_set_repo_archived(self, mock_github_token):
+        responses.add(
+            responses.PATCH,
+            "https://api.github.com/repos/user/repo",
+            json={},
+            status=200,
+        )
+
+        client = GitHubClient(mock_github_token)
+
+        assert client.set_repo_archived("user", "repo", False) is True
+        assert json.loads(responses.calls[0].request.body) == {"archived": False}
 
     @responses.activate
     def test_get_repo_languages(self, mock_github_token, sample_languages):
@@ -563,3 +578,72 @@ class TestGitHubClient:
         )
 
         assert result is False
+
+
+class TestOwnerRepoHelpers:
+    """Tests for owner/org detection and topic updates."""
+
+    @responses.activate
+    def test_get_repos_for_owner_detects_organization(self, mock_github_token):
+        responses.add(
+            responses.GET,
+            "https://api.github.com/users/acme",
+            json={"login": "acme", "type": "Organization"},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/orgs/acme/repos",
+            json=[{"name": "org-repo"}],
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/orgs/acme/repos",
+            json=[],
+            status=200,
+        )
+
+        client = GitHubClient(mock_github_token)
+        repos = client.get_repos_for_owner("acme")
+
+        assert repos == [{"name": "org-repo"}]
+
+    @responses.activate
+    def test_get_repos_for_owner_detects_user(self, mock_github_token):
+        responses.add(
+            responses.GET,
+            "https://api.github.com/users/alice",
+            json={"login": "alice", "type": "User"},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/users/alice/repos",
+            json=[{"name": "user-repo"}],
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/users/alice/repos",
+            json=[],
+            status=200,
+        )
+
+        client = GitHubClient(mock_github_token)
+        repos = client.get_repos_for_owner("alice")
+
+        assert repos == [{"name": "user-repo"}]
+
+    @responses.activate
+    def test_set_repo_topics(self, mock_github_token):
+        responses.add(
+            responses.PUT,
+            "https://api.github.com/repos/user/repo/topics",
+            json={"names": ["python"]},
+            status=200,
+        )
+
+        client = GitHubClient(mock_github_token)
+
+        assert client.set_repo_topics("user", "repo", ["python"]) is True

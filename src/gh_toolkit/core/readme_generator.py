@@ -27,7 +27,7 @@ class OrgReadmeGenerator:
         """
         self.client = github_client
         self.anthropic_api_key = anthropic_api_key
-        self._anthropic_client = None
+        self._anthropic_client: Any = None
 
         if anthropic_api_key:
             try:
@@ -222,7 +222,6 @@ JSON only, no markdown code blocks:"""
         response = self._anthropic_client.messages.create(
             model=DEFAULT_LLM_MODEL,
             max_tokens=500,
-            temperature=0.7,
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -594,5 +593,6 @@ JSON only, no markdown code blocks:"""
             output_path: Output file path
         """
         path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         console.print(f"[green]README saved to {path.absolute()}[/green]")

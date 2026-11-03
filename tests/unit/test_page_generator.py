@@ -271,3 +271,12 @@ A project with various links.
         assert "Use this template" in html_output
         assert "bg-green-600" in html_output  # Template button color
         assert "Get Started" in html_output  # Default button
+
+    def test_slugify_blocks_attribute_injection(self):
+        """Slugs are interpolated into id/href and must not break out."""
+        generator = PageGenerator("# Test")
+        slug = generator._slugify('bad " onmouseover="alert(1) <img src=x>')
+
+        assert '"' not in slug
+        assert "<" not in slug
+        assert ">" not in slug

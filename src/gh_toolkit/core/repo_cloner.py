@@ -1,7 +1,9 @@
 """Repository cloning functionality with parallel processing and organization."""
 
 import re
+import shutil
 import subprocess
+import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -30,6 +32,9 @@ class CloneResult:
     skipped: bool = False
     skip_reason: str | None = None
     note: str | None = None  # e.g. deadline-snapshot checkout outcome
+    # Path this operation is allowed to remove if the clone failed. None means
+    # "do not clean anything up" (e.g. the target existed before we started).
+    cleanup_path: Path | None = None
 
 
 @dataclass
@@ -116,7 +121,9 @@ class RepoCloner:
             # SSH format: git@github.com:owner/repo.git
             match = re.match(r"git@github\.com:([^/]+)/(.+?)(?:\.git)?$", url)
             if match:
-                return match.group(1), match.group(2)
+                owner, repo = match.group(1), match.group(2)
+                if self._is_valid_name(owner) and self._is_valid_name(repo):
+                    return owner, repo
         else:
             # HTTPS format: https://github.com/owner/repo
             parsed = urlparse(url)
@@ -127,7 +134,8 @@ class RepoCloner:
                     # Remove .git suffix if present
                     if repo.endswith(".git"):
                         repo = repo[:-4]
-                    return owner, repo
+                    if self._is_valid_name(owner) and self._is_valid_name(repo):
+                        return owner, repo
 
         raise ValueError(f"Invalid GitHub URL format: {url}")
 
@@ -182,8 +190,18 @@ class RepoCloner:
 
         Returns:
             Target path for repository
+
+        Raises:
+            ValueError: if the path would escape the target directory.
         """
-        return self.target_dir / owner / repo
+        target_root = self.target_dir.resolve()
+        target_path = self.target_dir / owner / repo
+        resolved = target_path.resolve()
+        if resolved == target_root or not resolved.is_relative_to(target_root):
+            raise ValueError(
+                f"Repository path escapes target directory: {owner}/{repo}"
+            )
+        return target_path
 
     def clone_repository(
         self,
@@ -213,6 +231,10 @@ class RepoCloner:
         # contain the commit before the deadline.
         if before is not None:
             depth = None
+
+        temp_root: Path | None = None
+        cleanup_path: Path | None = None
+        target_path: Path | None = None
         try:
             # Parse repository input
             owner, repo = self.parse_repo_input(repo_input)
@@ -245,6 +267,21 @@ class RepoCloner:
 
                 self._in_progress.add(target_path)
                 target_path.parent.mkdir(parents=True, exist_ok=True)
+                existed_before = target_path.exists()
+
+                if existed_before:
+                    # --overwrite: clone beside the existing directory and swap
+                    # it in only after the clone succeeds. A failed clone must
+                    # never remove the user's existing checkout.
+                    temp_root = Path(
+                        tempfile.mkdtemp(
+                            prefix=".gh-toolkit-clone-", dir=target_path.parent
+                        )
+                    )
+                    clone_target = temp_root / repo
+                else:
+                    clone_target = target_path
+                    cleanup_path = target_path
 
             try:
                 # Build git clone command
@@ -256,7 +293,7 @@ class RepoCloner:
                 if branch is not None:
                     cmd.extend(["--branch", branch])
 
-                cmd.extend([clone_url, str(target_path)])
+                cmd.extend([clone_url, str(clone_target)])
 
                 # Execute clone
                 result = subprocess.run(
@@ -267,6 +304,10 @@ class RepoCloner:
                 )
 
                 if result.returncode == 0:
+                    if existed_before:
+                        self._replace_directory(clone_target, target_path)
+                        temp_root = None
+                        cleanup_path = None
                     note = None
                     if before is not None:
                         note = self._checkout_before(target_path, before)
@@ -278,18 +319,25 @@ class RepoCloner:
                         note=note,
                     )
                 else:
+                    if existed_before:
+                        self._remove_path(temp_root)
+                        temp_root = None
+                        cleanup_path = None
                     return CloneResult(
                         repo_name=f"{owner}/{repo}",
                         repo_url=clone_url,
                         target_path=target_path,
                         success=False,
                         error=result.stderr.strip() or "Clone failed",
+                        cleanup_path=cleanup_path,
                     )
             finally:
                 with self._lock:
                     self._in_progress.discard(target_path)
 
         except ValueError as e:
+            if temp_root is not None:
+                self._remove_path(temp_root)
             return CloneResult(
                 repo_name=repo_input,
                 repo_url="",
@@ -298,20 +346,26 @@ class RepoCloner:
                 error=str(e),
             )
         except subprocess.TimeoutExpired:
+            if temp_root is not None:
+                self._remove_path(temp_root)
             return CloneResult(
                 repo_name=repo_input,
                 repo_url="",
-                target_path=Path(),
+                target_path=target_path or Path(),
                 success=False,
                 error="Clone operation timed out",
+                cleanup_path=cleanup_path,
             )
         except Exception as e:
+            if temp_root is not None:
+                self._remove_path(temp_root)
             return CloneResult(
                 repo_name=repo_input,
                 repo_url="",
-                target_path=Path(),
+                target_path=target_path or Path(),
                 success=False,
                 error=f"Unexpected error: {str(e)}",
+                cleanup_path=cleanup_path,
             )
 
     def _checkout_before(self, target_path: Path, before: str) -> str:
@@ -358,6 +412,34 @@ class RepoCloner:
             return f"Failed to check out {sha[:8]}: {checkout.stderr.strip()}"
 
         return f"Snapshot at {sha[:8]} (last commit before {before})"
+
+    @staticmethod
+    def _remove_path(path: Path | None) -> None:
+        """Remove a file or directory, ignoring errors and None."""
+        if path is None or not path.exists():
+            return
+        try:
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        except OSError:
+            pass
+
+    def _replace_directory(self, new_path: Path, target_path: Path) -> None:
+        """Replace ``target_path`` with ``new_path``, keeping a rollback copy."""
+        backup = target_path.with_name(target_path.name + ".gh-toolkit-old")
+        self._remove_path(backup)
+        target_path.rename(backup)
+        try:
+            new_path.rename(target_path)
+        except OSError:
+            backup.rename(target_path)
+            raise
+        finally:
+            self._remove_path(backup)
+            if new_path.parent != target_path.parent:
+                self._remove_path(new_path.parent)
 
     def clone_repositories(
         self,
@@ -512,21 +594,34 @@ class RepoCloner:
             Number of directories cleaned up
         """
         cleaned = 0
+        target_root = self.target_dir.resolve()
 
         for result in results:
-            if (
-                not result.success
-                and not result.skipped
-                and result.target_path.exists()
-            ):
-                try:
-                    # Remove partially cloned directory
-                    import shutil
+            if result.success or result.skipped or result.cleanup_path is None:
+                continue
 
-                    shutil.rmtree(result.target_path)
-                    cleaned += 1
-                except Exception:
-                    # Ignore cleanup errors
-                    pass
+            path = result.cleanup_path
+            try:
+                resolved = path.resolve()
+            except OSError:
+                continue
+
+            # Only ever remove a path we created inside the target directory.
+            # This blocks Path(".") and paths that escaped via traversal.
+            if resolved == target_root or not resolved.is_relative_to(target_root):
+                continue
+
+            if not resolved.exists():
+                continue
+
+            try:
+                if resolved.is_dir() and not resolved.is_symlink():
+                    shutil.rmtree(resolved)
+                else:
+                    resolved.unlink()
+                cleaned += 1
+            except OSError:
+                # Ignore cleanup errors
+                pass
 
         return cleaned
