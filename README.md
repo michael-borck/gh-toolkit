@@ -60,6 +60,9 @@ See [docs/gh-cli-comparison.md](docs/gh-cli-comparison.md) for a detailed featur
 > zero-dependency `git reclaim` subcommand that frees disk space (purge
 > regenerable caches, `git gc`) and flags clones that are safe to delete
 > because the remote already has everything.
+>
+> **Want one verb set across all of them?** [gx](https://github.com/michael-borck/gx)
+> is a thin dispatcher for `gh`, `gh-toolkit`, `gita`, and `git-reclaim`.
 
 ## 🚀 Quick Start
 

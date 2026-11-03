@@ -15,7 +15,7 @@ This document compares `gh-toolkit` with the official [GitHub CLI (`gh`)](https:
 
 ## Complementary Tools
 
-**These tools complement each other.** Use `gh` for daily GitHub work (PRs, issues, actions) and `gh-toolkit` for portfolio management, bulk operations, and presentation.
+**These tools complement each other.** Use `gh` for daily GitHub work (PRs, issues, actions) and `gh-toolkit` for portfolio management, bulk operations, and presentation. To use `gh`, `gh-toolkit`, `gita`, and `git-reclaim` through one verb set, see [gx](https://github.com/michael-borck/gx).
 
 ```bash
 # Daily workflow with gh
