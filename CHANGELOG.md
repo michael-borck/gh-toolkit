@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.29.1
+
+- Fix CI help tests on narrow terminals and GitHub Actions.
+
 ## 0.29.0
 
 - Add `repo restore` for descriptions and topics from an audit backup.
