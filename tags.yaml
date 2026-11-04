@@ -3,7 +3,7 @@
 # Two questions, eight tags:
 #
 #   1. What is it?      web-app, desktop-app, cli, book
-#   2. What is it about? ai, education, cybersecurity, research, operations
+#   2. What is it about? ai, education, cybersecurity, research, operations, maker
 #
 # A repository can answer both questions. Free tags add specificity, up to the
 # --free-tags limit. Keep the standard set small; put everything else in free
@@ -13,7 +13,7 @@
 # GitHub allows up to 20 topics per repository.
 
 name: Two-question standard tags
-version: 3
+version: 4
 
 tags:
   # What is it?
@@ -73,6 +73,13 @@ tags:
       - research prototypes, papers, datasets, evaluation harnesses
     exclusions:
       - teaching materials, general product code
+
+  maker:
+    description: Hardware, fabrication, 3D printing, astronomy equipment, and hands-on making.
+    examples:
+      - 3D printers, observatories, DIY electronics, workshop tools
+    exclusions:
+      - software-only tools, commercial products, general research
 
   operations:
     description: Private operating workspaces, indexes, and internal admin repos that coordinate a practice, series, or course.

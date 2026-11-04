@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `maker` as a standard tag for hardware, fabrication, 3D printing, and astronomy equipment.
+
 ## 0.29.1
 
 - Fix CI help tests on narrow terminals and GitHub Actions.

@@ -29,12 +29,12 @@ gh-toolkit repo tag [REPO_PATTERNS...] [OPTIONS]
 
 ## Two-question standard vocabulary
 
-Controlled tagging uses eight standard tags, split into two questions:
+Controlled tagging uses ten standard tags, split into two questions:
 
 | Question | Tags |
 |---|---|
 | What is it? | `web-app`, `desktop-app`, `cli`, `book` |
-| What is it about? | `ai`, `education`, `cybersecurity`, `research` |
+| What is it about? | `ai`, `education`, `cybersecurity`, `research`, `operations`, `maker` |
 
 A repository can answer both questions. A teaching web app about AI gets
 `web-app`, `education`, and `ai`. Free tags add specificity, up to the
@@ -54,6 +54,7 @@ flowchart LR
   Q2 --> D3[cybersecurity]
   Q2 --> D4[research]
   Q2 --> D5[operations]
+  Q2 --> D6[maker]
   R --> T[1-2 free tags]
 ```
 
